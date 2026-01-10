@@ -24,14 +24,22 @@ class EmailTrackerServiceProvider extends ServiceProvider
         $this->app->singleton(TrackedMailer::class, function (Application $app) {
             $transport = $app->make('mail.manager')->driver()->getSymfonyTransport();
 
-            return new TrackedMailer(
+            $mailer = new TrackedMailer(
                 'email-tracker',
                 $app->make('view'),
                 $transport,
                 $app->make('events'),
-                $app->make('config')->get('mail.from.address'),
-                $app->make('config')->get('mail.from.name'),
             );
+
+            // Set the global from address if configured
+            $fromAddress = $app->make('config')->get('mail.from.address');
+            $fromName = $app->make('config')->get('mail.from.name');
+
+            if ($fromAddress) {
+                $mailer->alwaysFrom($fromAddress, $fromName);
+            }
+
+            return $mailer;
         });
 
         // Register facade accessor

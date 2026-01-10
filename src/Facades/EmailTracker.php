@@ -35,7 +35,6 @@ use R0bdiabl0\EmailTracker\TrackedMailer;
  * @method static \Illuminate\Mail\PendingMail bcc(mixed $users, ?string $name = null)
  *
  * @see \R0bdiabl0\EmailTracker\TrackedMailer
- * @see \R0bdiabl0\EmailTracker\EmailTrackerManager
  */
 class EmailTracker extends Facade
 {

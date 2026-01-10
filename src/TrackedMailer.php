@@ -80,6 +80,11 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
     }
 
     /**
+     * The last sent message for return value.
+     */
+    protected ?SentMessage $lastSentMessage = null;
+
+    /**
      * Send the email with tracking.
      *
      * @param  MailableContract|string|array  $view
@@ -115,7 +120,7 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
         if ($this->shouldSendMessage($symfonyMessage, $data)) {
             try {
-                $this->sendSymfonyMessage($symfonyMessage);
+                return $this->sendSymfonyMessage($symfonyMessage);
             } catch (Throwable $e) {
                 $this->throwException($e, $symfonyMessage);
             }
@@ -126,8 +131,10 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
     /**
      * Send a Symfony message with tracking.
+     *
+     * @return SentMessage|null
      */
-    protected function sendSymfonyMessage(Email $message): void
+    protected function sendSymfonyMessage(Email $message): ?SentMessage
     {
         $sentEmail = $this->initMessage($message);
 
@@ -135,9 +142,12 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
         $message->html($this->setupTracking((string) $message->getHtmlBody(), $sentEmail));
 
-        parent::sendSymfonyMessage($message);
+        /** @var SentMessage|null $sentMessage */
+        $sentMessage = parent::sendSymfonyMessage($message);
 
         $this->sendEvent($sentEmail);
+
+        return $sentMessage;
     }
 
     /**

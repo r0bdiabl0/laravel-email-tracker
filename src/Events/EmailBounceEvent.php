@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Events;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use R0bdiabl0\EmailTracker\Contracts\EmailBounceContract;
@@ -20,6 +21,12 @@ class EmailBounceEvent
     public function __construct(EmailBounceContract $emailBounce)
     {
         $this->emailBounce = $emailBounce;
-        $this->data = $emailBounce->loadMissing('sentEmail')->toArray();
+
+        // Load relationship and convert to array if it's an Eloquent model
+        if ($emailBounce instanceof Model) {
+            $this->data = $emailBounce->loadMissing('sentEmail')->toArray();
+        } else {
+            $this->data = ['id' => $emailBounce->getId()];
+        }
     }
 }

@@ -100,7 +100,8 @@ class SesProvider extends AbstractProvider
      */
     public function parsePayload(array $payload): EmailEventData
     {
-        $eventType = $this->determineEventType($payload);
+        $sesEventType = $this->determineEventType($payload);
+        $eventType = $this->mapToEmailEventType($sesEventType);
 
         $mail = $payload['mail'] ?? [];
         $messageId = $mail['messageId'] ?? '';
@@ -111,12 +112,25 @@ class SesProvider extends AbstractProvider
             messageId: $messageId,
             email: $destination,
             provider: $this->getName(),
-            eventType: EmailEventType::from($eventType),
+            eventType: $eventType,
             timestamp: $timestamp ? \Carbon\Carbon::parse($timestamp) : null,
             bounceType: $payload['bounce']['bounceType'] ?? null,
             complaintType: $payload['complaint']['complaintFeedbackType'] ?? null,
             metadata: $payload,
         );
+    }
+
+    /**
+     * Map SES event type to EmailEventType enum.
+     */
+    protected function mapToEmailEventType(string $sesEventType): EmailEventType
+    {
+        return match ($sesEventType) {
+            'bounce' => EmailEventType::Bounced,
+            'complaint' => EmailEventType::Complained,
+            'delivery' => EmailEventType::Delivered,
+            default => EmailEventType::Sent,
+        };
     }
 
     /**

@@ -33,7 +33,7 @@ class Batch extends Model implements BatchContract
 
     public static function resolve(string $name): ?BatchContract
     {
-        return self::where('name', $name)->first();
+        return static::query()->where('name', $name)->first();
     }
 
     public function getId(): mixed

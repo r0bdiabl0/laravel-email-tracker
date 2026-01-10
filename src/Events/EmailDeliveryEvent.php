@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Events;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
@@ -20,6 +21,15 @@ class EmailDeliveryEvent
     public function __construct(SentEmailContract $sentEmail)
     {
         $this->sentEmail = $sentEmail;
-        $this->data = $sentEmail->toArray();
+
+        // Convert to array if it's an Eloquent model
+        if ($sentEmail instanceof Model) {
+            $this->data = $sentEmail->toArray();
+        } else {
+            $this->data = [
+                'id' => $sentEmail->getId(),
+                'message_id' => $sentEmail->getMessageId(),
+            ];
+        }
     }
 }

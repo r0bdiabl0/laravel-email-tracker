@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Events;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use R0bdiabl0\EmailTracker\Contracts\EmailLinkContract;
@@ -20,6 +21,12 @@ class EmailLinkClickEvent
     public function __construct(EmailLinkContract $emailLink)
     {
         $this->emailLink = $emailLink;
-        $this->data = $emailLink->loadMissing('sentEmail')->toArray();
+
+        // Load relationship and convert to array if it's an Eloquent model
+        if ($emailLink instanceof Model) {
+            $this->data = $emailLink->loadMissing('sentEmail')->toArray();
+        } else {
+            $this->data = ['id' => $emailLink->getId()];
+        }
     }
 }

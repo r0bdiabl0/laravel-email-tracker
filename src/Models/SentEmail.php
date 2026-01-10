@@ -88,13 +88,23 @@ class SentEmail extends Model implements SentEmailContract
         return $query->where('email', $email);
     }
 
+    /**
+     * @param  Builder<SentEmail>  $query
+     * @return Builder<SentEmail>
+     */
     public function scopeDelivered(Builder $query): Builder
     {
+        /** @var Builder<SentEmail> */
         return $query->whereNotNull('delivered_at');
     }
 
+    /**
+     * @param  Builder<SentEmail>  $query
+     * @return Builder<SentEmail>
+     */
     public function scopeNotDelivered(Builder $query): Builder
     {
+        /** @var Builder<SentEmail> */
         return $query->whereNull('delivered_at');
     }
 

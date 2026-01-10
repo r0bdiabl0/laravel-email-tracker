@@ -6,5 +6,17 @@ parameters:
     paths:
         - src
     tmpDir: .phpstan.cache
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # Laravel Eloquent magic methods
+        - message: '#Call to an undefined static method Illuminate\\Database\\Eloquent\\Model::#'
+          path: src/
+        # Laravel Model dynamic properties
+        - message: '#Access to an undefined property#'
+          path: src/Models/
+        # ModelResolver returns class strings
+        - message: '#Template type T of method R0bdiabl0\\EmailTracker\\ModelResolver#'
+          path: src/ModelResolver.php
+        # Traits not directly analysed
+        - message: '#Trait .* is used zero times and is not analysed#'
+          path: src/Traits/
