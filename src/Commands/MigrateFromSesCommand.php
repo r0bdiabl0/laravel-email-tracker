@@ -14,10 +14,10 @@ class MigrateFromSesCommand extends Command
     protected $signature = 'email-tracker:migrate-from-ses
         {--force : Run without confirmation}
         {--dry-run : Preview changes without executing}
-        {--backup : Keep old tables as *_backup}
         {--update-code : Also update PHP file namespaces}
         {--skip-config : Skip config file migration}
-        {--skip-database : Skip database table migration}';
+        {--skip-database : Skip database table migration}
+        {--delete-old : Delete old tables after successful migration (use with caution)}';
 
     protected $description = 'Migrate from juhasev/laravel-ses to r0bdiabl0/laravel-email-tracker';
 
@@ -59,7 +59,13 @@ class MigrateFromSesCommand extends Command
 
         // Execute migrations
         if (! $this->option('skip-database')) {
-            $this->migrateTables();
+            $success = $this->migrateTables();
+
+            if (! $success) {
+                $this->error('Migration failed. Old tables have not been modified.');
+
+                return Command::FAILURE;
+            }
         }
 
         if (! $this->option('skip-config')) {
@@ -72,6 +78,9 @@ class MigrateFromSesCommand extends Command
 
         // Show webhook URL updates
         $this->showWebhookUpdates();
+
+        // Show cleanup instructions
+        $this->showCleanupInstructions();
 
         if (! $this->option('dry-run')) {
             $this->newLine();
@@ -108,13 +117,18 @@ class MigrateFromSesCommand extends Command
 
         $prefix = config('email-tracker.table_prefix', '');
 
-        $this->line('  <fg=yellow>Database Tables:</>');
+        $this->line('  <fg=yellow>Database Tables (data will be COPIED, old tables preserved):</>');
         foreach ($this->tableMapping as $old => $new) {
             $newName = $prefix ? "{$prefix}_{$new}" : $new;
             if (Schema::hasTable($old)) {
-                $this->line("    {$old} -> {$newName}");
+                $rowCount = DB::table($old)->count();
+                $this->line("    {$old} ({$rowCount} rows) -> {$newName}");
             }
         }
+        $this->newLine();
+
+        $this->line('  <fg=green>Safety:</> Old tables will NOT be modified or deleted.');
+        $this->line('           You can delete them manually after verifying the migration.');
         $this->newLine();
 
         $this->line('  <fg=yellow>Config File:</>');
@@ -124,66 +138,145 @@ class MigrateFromSesCommand extends Command
             $this->line('    (No old config file found)');
         }
         $this->newLine();
-
-        if ($this->option('backup')) {
-            $this->line('  <fg=green>Backup:</>');
-            $this->line('    Old tables will be renamed to *_backup');
-            $this->newLine();
-        }
     }
 
-    protected function migrateTables(): void
+    protected function migrateTables(): bool
     {
         $this->info('Migrating database tables...');
+        $this->newLine();
 
         $prefix = config('email-tracker.table_prefix', '');
+
+        // First, ensure all new tables exist (run migrations if needed)
+        $this->line('  <fg=cyan>Step 1: Ensuring new tables exist...</>');
 
         foreach ($this->tableMapping as $old => $new) {
             $newName = $prefix ? "{$prefix}_{$new}" : $new;
 
             if (! Schema::hasTable($old)) {
-                $this->line("  <fg=gray>Skipping {$old} (not found)</>");
+                continue;
+            }
+
+            if (Schema::hasTable($newName)) {
+                $existingCount = DB::table($newName)->count();
+                if ($existingCount > 0) {
+                    $this->warn("    Table {$newName} already has {$existingCount} rows.");
+
+                    if (! $this->option('force') && ! $this->option('dry-run')) {
+                        if (! $this->confirm("    Merge data into existing {$newName} table?")) {
+                            $this->line("    Skipping {$old}...");
+
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Copy data from old tables to new tables
+        $this->newLine();
+        $this->line('  <fg=cyan>Step 2: Copying data to new tables...</>');
+
+        // Order matters for foreign keys - batches first, then sent_emails, then the rest
+        $orderedMapping = [
+            'laravel_ses_batches' => 'batches',
+            'laravel_ses_sent_emails' => 'sent_emails',
+            'laravel_ses_email_bounces' => 'email_bounces',
+            'laravel_ses_email_complaints' => 'email_complaints',
+            'laravel_ses_email_opens' => 'email_opens',
+            'laravel_ses_email_links' => 'email_links',
+        ];
+
+        foreach ($orderedMapping as $old => $new) {
+            $newName = $prefix ? "{$prefix}_{$new}" : $new;
+
+            if (! Schema::hasTable($old)) {
+                $this->line("    <fg=gray>Skipping {$old} (not found)</>");
 
                 continue;
             }
 
             if ($this->option('dry-run')) {
-                $this->line("  Would rename: {$old} -> {$newName}");
+                $rowCount = DB::table($old)->count();
+                $this->line("    Would copy {$rowCount} rows: {$old} -> {$newName}");
 
                 continue;
             }
 
-            // Check if new table already exists
-            if (Schema::hasTable($newName)) {
-                $this->warn("  Table {$newName} already exists, skipping...");
+            try {
+                $this->copyTableData($old, $newName);
+            } catch (\Exception $e) {
+                $this->error("    Failed to copy {$old}: {$e->getMessage()}");
 
-                continue;
-            }
-
-            // Backup if requested
-            if ($this->option('backup')) {
-                $backupName = "{$old}_backup";
-                if (! Schema::hasTable($backupName)) {
-                    Schema::rename($old, $backupName);
-                    Schema::rename($backupName, $newName);
-                    $this->line("  <fg=green>Renamed: {$old} -> {$newName} (backup: {$backupName})</>");
-                } else {
-                    Schema::rename($old, $newName);
-                    $this->line("  <fg=green>Renamed: {$old} -> {$newName}</>");
-                }
-            } else {
-                Schema::rename($old, $newName);
-                $this->line("  <fg=green>Renamed: {$old} -> {$newName}</>");
-            }
-
-            // Add provider column if not exists
-            if (! Schema::hasColumn($newName, 'provider')) {
-                Schema::table($newName, function ($table) {
-                    $table->string('provider')->default('ses')->after('id')->index();
-                });
-                $this->line("  <fg=green>Added provider column to: {$newName}</>");
+                return false;
             }
         }
+
+        // Optionally delete old tables
+        if ($this->option('delete-old') && ! $this->option('dry-run')) {
+            $this->newLine();
+            $this->line('  <fg=cyan>Step 3: Deleting old tables...</>');
+
+            foreach (array_keys($this->tableMapping) as $old) {
+                if (Schema::hasTable($old)) {
+                    Schema::dropIfExists($old);
+                    $this->line("    <fg=red>Deleted: {$old}</>");
+                }
+            }
+        }
+
+        return true;
+    }
+
+    protected function copyTableData(string $oldTable, string $newTable): void
+    {
+        $rowCount = DB::table($oldTable)->count();
+
+        if ($rowCount === 0) {
+            $this->line("    <fg=gray>Skipping {$oldTable} (empty)</>");
+
+            return;
+        }
+
+        // Get columns from old table
+        $oldColumns = Schema::getColumnListing($oldTable);
+
+        // Check if new table exists, if not we need to create it first
+        if (! Schema::hasTable($newTable)) {
+            $this->error("    New table {$newTable} does not exist. Run migrations first.");
+            throw new \RuntimeException("Table {$newTable} does not exist");
+        }
+
+        $newColumns = Schema::getColumnListing($newTable);
+
+        // Find common columns (excluding 'provider' which we'll add)
+        $commonColumns = array_intersect($oldColumns, $newColumns);
+
+        // Copy data in chunks to handle large tables
+        $chunkSize = 1000;
+        $copied = 0;
+
+        DB::table($oldTable)->orderBy('id')->chunk($chunkSize, function ($rows) use ($newTable, $commonColumns, &$copied) {
+            $insertData = [];
+
+            foreach ($rows as $row) {
+                $rowData = [];
+                foreach ($commonColumns as $column) {
+                    $rowData[$column] = $row->{$column};
+                }
+
+                // Add provider column with default 'ses'
+                $rowData['provider'] = 'ses';
+
+                $insertData[] = $rowData;
+            }
+
+            // Use insertOrIgnore to skip duplicates (if re-running migration)
+            DB::table($newTable)->insertOrIgnore($insertData);
+            $copied += count($insertData);
+        });
+
+        $this->line("    <fg=green>Copied {$copied} rows: {$oldTable} -> {$newTable}</>");
     }
 
     protected function migrateConfig(): void
@@ -287,5 +380,29 @@ class MigrateFromSesCommand extends Command
         $this->newLine();
 
         $this->line('  <fg=gray>To enable legacy routes, set EMAIL_TRACKER_LEGACY_ROUTES=true</>');
+    }
+
+    protected function showCleanupInstructions(): void
+    {
+        if ($this->option('delete-old') || $this->option('dry-run')) {
+            return;
+        }
+
+        $this->newLine();
+        $this->line('<fg=cyan>Old Tables Cleanup:</>');
+        $this->newLine();
+        $this->line('  Your old tables have been preserved. After verifying the migration');
+        $this->line('  works correctly, you can delete them manually:');
+        $this->newLine();
+
+        foreach (array_keys($this->tableMapping) as $old) {
+            if (Schema::hasTable($old)) {
+                $this->line("    DROP TABLE {$old};");
+            }
+        }
+
+        $this->newLine();
+        $this->line('  Or re-run with --delete-old flag:');
+        $this->line('    php artisan email-tracker:migrate-from-ses --delete-old');
     }
 }
