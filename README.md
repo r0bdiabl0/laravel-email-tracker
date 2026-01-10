@@ -769,12 +769,23 @@ public function boot(): void
 ],
 ```
 
-**Step 4: Set up webhook URL**
+**Step 4: Configure webhooks in your email provider**
 
-Your custom provider's webhook URL will be:
+Your custom provider's webhook endpoint is automatically registered at:
 ```
-https://your-app.com/email-tracker/webhook/custom-smtp
+POST https://your-app.com/email-tracker/webhook/custom-smtp
 ```
+
+Configure this URL in your email provider's dashboard/settings:
+
+1. **Set the webhook URL** to `https://your-app.com/email-tracker/webhook/custom-smtp`
+2. **Select event types** to receive (bounces, complaints, deliveries, opens, clicks)
+3. **Configure authentication** - if your provider supports webhook signing:
+   - Copy the signing secret/key from your provider
+   - Add it to your `.env`: `EMAIL_TRACKER_CUSTOM_SMTP_SECRET=your-secret-here`
+4. **Test the webhook** - most providers have a "send test" feature
+
+The package handles routing automatically - any POST request to `/email-tracker/webhook/{provider-name}` will be routed to your provider's `handleWebhook()` method.
 
 ### AbstractProvider Helper Methods
 
