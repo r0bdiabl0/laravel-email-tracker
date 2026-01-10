@@ -831,6 +831,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Run `composer test` and `composer analyse`
 5. Submit a pull request
 
+For bugs and feature requests, please [open an issue](https://github.com/r0bdiabl0/laravel-email-tracker/issues).
+
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE) for more information.
