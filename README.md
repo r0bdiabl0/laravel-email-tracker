@@ -22,6 +22,7 @@ A **multi-provider email tracking package** for Laravel 11+ that provides unifie
   - [Postmark Setup](#postmark-setup)
   - [Postal Setup](#postal-setup)
 - [Security Considerations](#security-considerations)
+- [One-Click Unsubscribe (RFC 8058)](#one-click-unsubscribe-rfc-8058)
 - [Events](#events)
 - [Pre-Send Validation](#pre-send-validation)
 - [Database Schema](#database-schema)
@@ -48,6 +49,7 @@ A **multi-provider email tracking package** for Laravel 11+ that provides unifie
 - **Batch Grouping** - Organize emails into named batches for campaigns or bulk sends
 - **Multi-Provider Support** - Unified interface across 6 major email providers
 - **Pre-Send Validation** - Optionally block sending to previously bounced/complained addresses
+- **One-Click Unsubscribe** - RFC 8058 compliant List-Unsubscribe headers for improved deliverability
 - **Event Dispatching** - Laravel events for all tracking activities for your own listeners
 
 ## What This Package Does NOT Do
@@ -213,9 +215,16 @@ The `provider` column in the database tracks which service sent each email, allo
 use R0bdiabl0\EmailTracker\Facades\EmailTracker;
 
 // Enable all tracking (opens, links, bounces, complaints, deliveries)
+// Note: This does NOT enable unsubscribe headers - use enableUnsubscribeHeaders() separately
 EmailTracker::enableAllTracking()
     ->to('user@example.com')
     ->send(new WelcomeMail($user));
+
+// With unsubscribe headers for bulk/marketing emails
+EmailTracker::enableAllTracking()
+    ->enableUnsubscribeHeaders()  // Add RFC 8058 List-Unsubscribe headers
+    ->to('user@example.com')
+    ->send(new MarketingMail($user));
 
 // With batch grouping for campaigns
 EmailTracker::enableAllTracking()
@@ -396,6 +405,135 @@ protected $except = [
 ];
 ```
 
+## One-Click Unsubscribe (RFC 8058)
+
+The package supports RFC 8058 compliant one-click unsubscribe headers, which are now required by Gmail, Yahoo, and other major email providers for bulk senders. This feature improves deliverability and helps you comply with sender requirements.
+
+### How It Works
+
+1. When enabled, the package adds `List-Unsubscribe` and `List-Unsubscribe-Post` headers to your emails
+2. Email clients show an "Unsubscribe" button in their UI
+3. When clicked, a POST request is sent to your app's signed unsubscribe endpoint
+4. The package validates the signature and fires an `EmailUnsubscribeEvent`
+5. **You handle the business logic** in your event listener
+
+### Enabling Unsubscribe Headers
+
+#### Option 1: Global (All Tracked Emails)
+
+```env
+EMAIL_TRACKER_UNSUBSCRIBE_ENABLED=true
+```
+
+#### Option 2: Per-Email
+
+```php
+use R0bdiabl0\EmailTracker\Facades\EmailTracker;
+
+EmailTracker::enableAllTracking()
+    ->enableUnsubscribeHeaders()
+    ->to('user@example.com')
+    ->send(new NewsletterMail($user));
+```
+
+### Configuration
+
+```php
+// config/email-tracker.php
+'unsubscribe' => [
+    // Enable one-click unsubscribe headers globally
+    'enabled' => env('EMAIL_TRACKER_UNSUBSCRIBE_ENABLED', false),
+
+    // Optional: Include a mailto: fallback (some older clients prefer this)
+    'mailto' => env('EMAIL_TRACKER_UNSUBSCRIBE_MAILTO'),
+
+    // Signature expiration in hours (0 = no expiration)
+    'signature_expiration' => env('EMAIL_TRACKER_UNSUBSCRIBE_EXPIRATION', 0),
+
+    // Redirect URL after unsubscribe (null = return JSON response)
+    'redirect_url' => env('EMAIL_TRACKER_UNSUBSCRIBE_REDIRECT'),
+],
+```
+
+### Handling Unsubscribe Events
+
+Register a listener for the `EmailUnsubscribeEvent`:
+
+```php
+use R0bdiabl0\EmailTracker\Events\EmailUnsubscribeEvent;
+
+// In EventServiceProvider
+protected $listen = [
+    EmailUnsubscribeEvent::class => [
+        \App\Listeners\HandleUnsubscribe::class,
+    ],
+];
+```
+
+```php
+namespace App\Listeners;
+
+use R0bdiabl0\EmailTracker\Events\EmailUnsubscribeEvent;
+
+class HandleUnsubscribe
+{
+    public function handle(EmailUnsubscribeEvent $event): void
+    {
+        $email = $event->email;
+        $messageId = $event->messageId;
+        $sentEmail = $event->sentEmail; // May be null
+
+        // Update user preferences
+        User::where('email', $email)
+            ->update(['marketing_emails' => false]);
+
+        // Or remove from specific mailing list based on batch
+        if ($sentEmail && $sentEmail->batch) {
+            MailingListSubscription::where('email', $email)
+                ->where('list', $sentEmail->batch->name)
+                ->delete();
+        }
+
+        Log::info("User unsubscribed", ['email' => $email]);
+    }
+}
+```
+
+### CSRF Protection
+
+The unsubscribe endpoint needs to be excluded from CSRF protection (it receives POST requests from external email clients):
+
+```php
+// bootstrap/app.php (Laravel 11+)
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->validateCsrfTokens(except: [
+        'email-tracker/webhook/*',  // Adjust if using custom EMAIL_TRACKER_ROUTE_PREFIX
+        'email-tracker/unsubscribe',
+    ]);
+})
+```
+
+> **Note:** If you configured a custom route prefix via `EMAIL_TRACKER_ROUTE_PREFIX`, update the CSRF exclusion paths accordingly.
+
+### Security Recommendations
+
+- **Rate Limiting:** Consider adding rate limiting middleware to your `HandleUnsubscribe` listener or at the route level to prevent abuse:
+  ```php
+  // In your event listener
+  if (RateLimiter::tooManyAttempts('unsubscribe:' . $event->email, 5)) {
+      Log::warning('Unsubscribe rate limit exceeded', ['email' => $event->email]);
+      return;
+  }
+  RateLimiter::hit('unsubscribe:' . $event->email, 3600);
+  ```
+- **Signature Expiration:** For added security, set `signature_expiration` to expire unsubscribe links after a reasonable time (e.g., 720 hours / 30 days)
+
+### What This Feature Does NOT Do
+
+- Does NOT manage subscription lists - you define what "unsubscribe" means for your app
+- Does NOT store unsubscribe preferences - you update your own user/subscription models
+- Does NOT decide per-list vs global unsubscribe - your listener implements this logic
+
 ## Events
 
 The package dispatches events for all tracking activities. Listen to these in your `EventServiceProvider`:
@@ -407,6 +545,7 @@ use R0bdiabl0\EmailTracker\Events\EmailBounceEvent;
 use R0bdiabl0\EmailTracker\Events\EmailComplaintEvent;
 use R0bdiabl0\EmailTracker\Events\EmailOpenEvent;
 use R0bdiabl0\EmailTracker\Events\EmailLinkClickEvent;
+use R0bdiabl0\EmailTracker\Events\EmailUnsubscribeEvent;
 
 protected $listen = [
     EmailBounceEvent::class => [
@@ -414,6 +553,9 @@ protected $listen = [
     ],
     EmailComplaintEvent::class => [
         \App\Listeners\HandleEmailComplaint::class,
+    ],
+    EmailUnsubscribeEvent::class => [
+        \App\Listeners\HandleUnsubscribe::class,
     ],
 ];
 ```

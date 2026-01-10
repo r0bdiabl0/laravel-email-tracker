@@ -28,5 +28,5 @@ parameters:
         - message: '#Trait .* is used zero times and is not analysed#'
           path: src/Traits/
         # Event constructors and sendEvent methods expect contracts but get models via ModelResolver
-        - message: '#Parameter .* expects R0bdiabl0\\EmailTracker\\Contracts\\.*Contract, Illuminate\\Database\\Eloquent\\Model given#'
+        - message: '#Parameter .* expects R0bdiabl0\\EmailTracker\\Contracts\\.*Contract.*Illuminate\\Database\\Eloquent\\Model.*given#'
           path: src/

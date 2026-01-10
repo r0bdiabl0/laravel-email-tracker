@@ -133,6 +133,41 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | One-Click Unsubscribe (RFC 8058)
+    |--------------------------------------------------------------------------
+    |
+    | Enable RFC 8058 compliant one-click unsubscribe headers for improved
+    | email deliverability. Gmail, Yahoo, and other major providers require
+    | this for bulk senders.
+    |
+    | When enabled, List-Unsubscribe and List-Unsubscribe-Post headers are
+    | added to tracked emails. The package provides a signed URL endpoint
+    | that fires an EmailUnsubscribeEvent - you handle the business logic
+    | in your event listener.
+    |
+    | Note: This feature handles the RFC compliance (headers, signed URLs,
+    | endpoint). Your application must handle the actual unsubscribe logic
+    | by listening to the EmailUnsubscribeEvent.
+    |
+    */
+
+    'unsubscribe' => [
+        // Enable one-click unsubscribe headers
+        'enabled' => env('EMAIL_TRACKER_UNSUBSCRIBE_ENABLED', false),
+
+        // Optional: Include a mailto: unsubscribe fallback (some clients prefer this)
+        // Format: your-unsubscribe@example.com or null to disable
+        'mailto' => env('EMAIL_TRACKER_UNSUBSCRIBE_MAILTO'),
+
+        // Signature expiration in hours (0 = no expiration)
+        'signature_expiration' => env('EMAIL_TRACKER_UNSUBSCRIBE_EXPIRATION', 0),
+
+        // Redirect URL after unsubscribe (null = return JSON response)
+        'redirect_url' => env('EMAIL_TRACKER_UNSUBSCRIBE_REDIRECT'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Validation Options
     |--------------------------------------------------------------------------
     |

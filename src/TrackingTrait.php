@@ -21,6 +21,8 @@ trait TrackingTrait
 
     protected bool $deliveryTracking = false;
 
+    protected bool $unsubscribeHeaders = false;
+
     protected ?BatchContract $batch = null;
 
     /**
@@ -135,6 +137,20 @@ trait TrackingTrait
         return $this;
     }
 
+    public function enableUnsubscribeHeaders(): TrackedMailerInterface
+    {
+        $this->unsubscribeHeaders = true;
+
+        return $this;
+    }
+
+    public function disableUnsubscribeHeaders(): TrackedMailerInterface
+    {
+        $this->unsubscribeHeaders = false;
+
+        return $this;
+    }
+
     public function enableAllTracking(): TrackedMailerInterface
     {
         return $this->enableOpenTracking()
@@ -150,7 +166,8 @@ trait TrackingTrait
             ->disableLinkTracking()
             ->disableBounceTracking()
             ->disableComplaintTracking()
-            ->disableDeliveryTracking();
+            ->disableDeliveryTracking()
+            ->disableUnsubscribeHeaders();
     }
 
     public function trackingSettings(): array
@@ -161,6 +178,7 @@ trait TrackingTrait
             'bounceTracking' => $this->bounceTracking,
             'complaintTracking' => $this->complaintTracking,
             'deliveryTracking' => $this->deliveryTracking,
+            'unsubscribeHeaders' => $this->unsubscribeHeaders,
         ];
     }
 }

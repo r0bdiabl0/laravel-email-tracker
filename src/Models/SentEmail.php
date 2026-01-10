@@ -178,6 +178,11 @@ class SentEmail extends Model implements SentEmailContract
         return $this->message_id;
     }
 
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
     // Helper methods
 
     public function wasBounced(): bool

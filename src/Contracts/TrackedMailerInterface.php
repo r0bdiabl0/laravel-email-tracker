@@ -50,4 +50,8 @@ interface TrackedMailerInterface
     public function disableComplaintTracking(): self;
 
     public function disableDeliveryTracking(): self;
+
+    public function enableUnsubscribeHeaders(): self;
+
+    public function disableUnsubscribeHeaders(): self;
 }

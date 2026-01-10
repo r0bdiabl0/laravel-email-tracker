@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use R0bdiabl0\EmailTracker\Controllers\LinkController;
 use R0bdiabl0\EmailTracker\Controllers\OpenController;
+use R0bdiabl0\EmailTracker\Controllers\UnsubscribeController;
 use R0bdiabl0\EmailTracker\Controllers\WebhookController;
 
 Route::prefix(config('email-tracker.routes.prefix', 'email-tracker'))
@@ -23,4 +24,13 @@ Route::prefix(config('email-tracker.routes.prefix', 'email-tracker'))
 
         Route::get('/link/{linkIdentifier}', [LinkController::class, 'track'])
             ->name('email-tracker.link');
+
+        // One-click unsubscribe endpoint (RFC 8058)
+        // POST is required by RFC 8058 for one-click unsubscribe
+        Route::post('/unsubscribe', [UnsubscribeController::class, 'handle'])
+            ->name('email-tracker.unsubscribe');
+
+        // GET endpoint for manual unsubscribe links in email body
+        Route::get('/unsubscribe', [UnsubscribeController::class, 'handle'])
+            ->name('email-tracker.unsubscribe.get');
     });

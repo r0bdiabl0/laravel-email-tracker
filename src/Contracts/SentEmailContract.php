@@ -10,6 +10,8 @@ interface SentEmailContract
 {
     public function getId(): mixed;
 
+    public function getEmail(): string;
+
     public function getMessageId(): string;
 
     public function setMessageId(string $messageId): self;
