@@ -4,25 +4,36 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/r0bdiabl0/laravel-email-tracker.svg?style=flat-square)](https://packagist.org/packages/r0bdiabl0/laravel-email-tracker)
 [![License](https://img.shields.io/packagist/l/r0bdiabl0/laravel-email-tracker.svg?style=flat-square)](https://packagist.org/packages/r0bdiabl0/laravel-email-tracker)
 
-A multi-provider email tracking package for Laravel 11+ that tracks opens, clicks, bounces, complaints, and deliveries across **AWS SES, Resend, Postal, Mailgun, SendGrid, Postmark**, and more.
+A **multi-provider email tracking package** for Laravel 11+ that provides unified tracking for opens, clicks, bounces, complaints, and deliveries across **AWS SES, Resend, Postal, Mailgun, SendGrid, and Postmark**.
 
-## Features
+## What This Package Does
 
-- **Multi-Provider Support** - Track emails from multiple providers in a unified way
-- **Email Opens** - Track when recipients open emails (via tracking pixel)
-- **Link Clicks** - Track when recipients click links in emails
-- **Bounces** - Automatically track bounced emails (hard and soft)
-- **Complaints** - Track spam complaints
-- **Deliveries** - Confirm successful email deliveries
-- **Batch Grouping** - Group emails into batches for analytics
-- **Configurable Tables** - Customize table names with prefixes
-- **Laravel 11, 12, 13 Ready** - Built with modern Laravel best practices
-- **Optional Features** - Traits and notification channels are opt-in
+- **Tracks Sent Emails** - Stores records of all emails sent through the package with their message IDs
+- **Open Tracking** - Injects a 1x1 tracking pixel to detect when recipients open emails
+- **Link Click Tracking** - Rewrites links to track when recipients click them, with click counts
+- **Bounce Handling** - Receives and processes bounce notifications from email providers via webhooks
+- **Complaint Handling** - Tracks spam complaints reported by recipients
+- **Delivery Confirmation** - Records successful deliveries reported by email providers
+- **Batch Grouping** - Organize emails into named batches for campaigns or bulk sends
+- **Multi-Provider Support** - Unified interface across 6 major email providers
+- **Pre-Send Validation** - Optionally block sending to previously bounced/complained addresses
+- **Event Dispatching** - Laravel events for all tracking activities for your own listeners
+
+## What This Package Does NOT Do
+
+- **Does NOT send emails** - This package tracks emails sent via Laravel's mail system. You still need to configure Laravel Mail with your provider (SES, Mailgun, etc.)
+- **Does NOT provide SMTP services** - You need your own email provider account
+- **Does NOT guarantee open tracking accuracy** - Many email clients block tracking pixels. Open tracking should be considered a lower-bound estimate
+- **Does NOT track replies** - This package tracks delivery events, not incoming mail
+- **Does NOT provide analytics dashboards** - It stores data in your database; you build your own reports or use tools like Filament
+- **Does NOT handle transactional email templates** - Use Laravel's Mailable system for that
+- **Does NOT replace your email provider's dashboard** - It supplements it with data in your own database
 
 ## Requirements
 
 - PHP 8.2+
 - Laravel 11.0+
+- An email provider account (AWS SES, Resend, Postal, Mailgun, SendGrid, or Postmark)
 
 ## Installation
 
@@ -37,41 +48,86 @@ php artisan email-tracker:install
 ```
 
 This will:
-1. Publish the configuration file
+1. Publish the configuration file to `config/email-tracker.php`
 2. Publish the migrations
 3. Optionally run the migrations
 
 ## Configuration
 
-The configuration file is published to `config/email-tracker.php`.
+### Environment Variables
 
-### Table Prefix
+Add these to your `.env` file:
 
-By default, tables are created without a prefix. You can customize this:
+```env
+# Default provider (ses, resend, postal, mailgun, sendgrid, postmark)
+EMAIL_TRACKER_DEFAULT_PROVIDER=ses
 
-```php
-// config/email-tracker.php
-'table_prefix' => env('EMAIL_TRACKER_TABLE_PREFIX', ''),
+# Optional table prefix (leave empty for no prefix)
+EMAIL_TRACKER_TABLE_PREFIX=
 
-// With prefix 'tracker_':
-// tracker_sent_emails, tracker_email_bounces, etc.
+# Optional route prefix (default: email-tracker)
+EMAIL_TRACKER_ROUTE_PREFIX=email-tracker
+
+# Debug logging
+EMAIL_TRACKER_DEBUG=false
+
+# Provider-specific settings
+EMAIL_TRACKER_SES_ENABLED=true
+EMAIL_TRACKER_RESEND_ENABLED=false
+EMAIL_TRACKER_POSTAL_ENABLED=false
+EMAIL_TRACKER_MAILGUN_ENABLED=false
+EMAIL_TRACKER_SENDGRID_ENABLED=false
+EMAIL_TRACKER_POSTMARK_ENABLED=false
+
+# Webhook signing secrets (provider-specific)
+# AWS SES: Uses SNS certificate validation (automatic)
+# Resend: Uses Svix webhook signatures
+EMAIL_TRACKER_RESEND_WEBHOOK_SECRET=whsec_...
+# Mailgun: HMAC-SHA256 with your signing key
+EMAIL_TRACKER_MAILGUN_WEBHOOK_SIGNING_KEY=key-...
+# SendGrid: ECDSA verification key (public key in PEM format)
+EMAIL_TRACKER_SENDGRID_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----..."
+# Postal: Simple shared key in X-Postal-Webhook-Key header
+EMAIL_TRACKER_POSTAL_WEBHOOK_KEY=your-secret-key
+# Postmark: Token in X-Postmark-Webhook-Token header or Basic auth
+EMAIL_TRACKER_POSTMARK_WEBHOOK_TOKEN=your-token
 ```
+
+### Table Names
+
+By default, tables are created without a prefix:
+- `sent_emails`
+- `email_opens`
+- `email_bounces`
+- `email_complaints`
+- `email_links`
+- `batches`
+
+With a prefix like `tracker_`:
+- `tracker_sent_emails`
+- `tracker_email_bounces`
+- etc.
 
 ### Enable Providers
 
 Enable only the providers you use:
 
 ```php
+// config/email-tracker.php
 'providers' => [
     'ses' => [
         'enabled' => env('EMAIL_TRACKER_SES_ENABLED', true),
-        // ...
+        'sns_validator' => true, // Validate SNS message signatures
     ],
     'resend' => [
         'enabled' => env('EMAIL_TRACKER_RESEND_ENABLED', false),
-        // ...
+        'webhook_secret' => env('EMAIL_TRACKER_RESEND_WEBHOOK_SECRET'),
     ],
-    // ...
+    'mailgun' => [
+        'enabled' => env('EMAIL_TRACKER_MAILGUN_ENABLED', false),
+        'webhook_signing_key' => env('EMAIL_TRACKER_MAILGUN_WEBHOOK_SIGNING_KEY'),
+    ],
+    // ... etc.
 ],
 ```
 
@@ -82,20 +138,26 @@ Enable only the providers you use:
 ```php
 use R0bdiabl0\EmailTracker\Facades\EmailTracker;
 
-// Enable all tracking
+// Enable all tracking (opens, links, bounces, complaints, deliveries)
 EmailTracker::enableAllTracking()
     ->to('user@example.com')
     ->send(new WelcomeMail($user));
 
-// With batch grouping
+// With batch grouping for campaigns
 EmailTracker::enableAllTracking()
-    ->setBatch('welcome-campaign')
+    ->setBatch('welcome-campaign-2024')
     ->to('user@example.com')
     ->send(new WelcomeMail($user));
 
 // Enable specific tracking only
 EmailTracker::enableOpenTracking()
     ->enableLinkTracking()
+    ->to('user@example.com')
+    ->send(new WelcomeMail($user));
+
+// Specify provider explicitly
+EmailTracker::provider('resend')
+    ->enableAllTracking()
     ->to('user@example.com')
     ->send(new WelcomeMail($user));
 ```
@@ -112,10 +174,13 @@ class WelcomeMail extends Mailable
 {
     use TracksWithEmail;
 
-    // ...
+    public function build()
+    {
+        return $this->view('emails.welcome');
+    }
 }
 
-// Then use:
+// Static methods for quick sending
 WelcomeMail::sendTracked('user@example.com', batch: 'welcome');
 WelcomeMail::queueTracked(['user@example.com'], batch: 'welcome', queue: 'emails');
 ```
@@ -142,92 +207,301 @@ class WelcomeNotification extends Notification
 
 ## Webhook Setup
 
-### AWS SES
+Your email provider will send event notifications (bounces, complaints, deliveries) to these webhook URLs. You must configure these URLs in each provider's dashboard.
 
-Set up SNS topics for bounce, complaint, and delivery notifications:
+### Webhook URLs
 
+| Provider  | Webhook URL |
+|-----------|-------------|
+| AWS SES   | `https://your-app.com/email-tracker/webhook/ses/bounce`<br>`https://your-app.com/email-tracker/webhook/ses/complaint`<br>`https://your-app.com/email-tracker/webhook/ses/delivery` |
+| Resend    | `https://your-app.com/email-tracker/webhook/resend` |
+| Postal    | `https://your-app.com/email-tracker/webhook/postal` |
+| Mailgun   | `https://your-app.com/email-tracker/webhook/mailgun` |
+| SendGrid  | `https://your-app.com/email-tracker/webhook/sendgrid` |
+| Postmark  | `https://your-app.com/email-tracker/webhook/postmark` |
+
+### AWS SES Setup
+
+1. Create SNS topics for bounces, complaints, and deliveries in AWS Console
+2. Add HTTPS subscriptions pointing to your webhook URLs
+3. Configure your SES domain/email to publish to these SNS topics
+4. The package automatically validates SNS message signatures
+
+```bash
+# Example: Create SNS subscription via AWS CLI
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:123456789:ses-bounces \
+  --protocol https \
+  --notification-endpoint https://your-app.com/email-tracker/webhook/ses/bounce
 ```
-POST https://your-app.com/email-tracker/webhook/ses/bounce
-POST https://your-app.com/email-tracker/webhook/ses/complaint
-POST https://your-app.com/email-tracker/webhook/ses/delivery
-```
 
-### Other Providers
+### Resend Setup
 
-```
-POST https://your-app.com/email-tracker/webhook/resend
-POST https://your-app.com/email-tracker/webhook/postal
-POST https://your-app.com/email-tracker/webhook/mailgun
-POST https://your-app.com/email-tracker/webhook/sendgrid
-POST https://your-app.com/email-tracker/webhook/postmark
+1. Go to Resend Dashboard > Webhooks
+2. Add a new webhook pointing to `https://your-app.com/email-tracker/webhook/resend`
+3. Select events: `email.bounced`, `email.complained`, `email.delivered`
+4. Copy the signing secret (starts with `whsec_`) to your `.env`
+
+### Mailgun Setup
+
+1. Go to Mailgun Dashboard > Sending > Webhooks
+2. Add webhook URLs for Permanent Failures, Temporary Failures, and Delivered
+3. Copy your webhook signing key to your `.env`
+
+### SendGrid Setup
+
+1. Go to SendGrid Dashboard > Settings > Mail Settings > Event Webhook
+2. Set the HTTP POST URL to `https://your-app.com/email-tracker/webhook/sendgrid`
+3. Select events: Bounced, Spam Reports, Delivered
+4. Enable Event Webhook Security and copy the verification key
+
+### Postmark Setup
+
+1. Go to Postmark > Servers > Your Server > Webhooks
+2. Add webhooks for Bounces, Spam Complaints, and Deliveries
+3. Set the webhook URL and optionally configure Basic Auth for security
+
+### Postal Setup
+
+1. Go to your Postal server admin panel
+2. Add a webhook endpoint pointing to `https://your-app.com/email-tracker/webhook/postal`
+3. Configure the shared secret key in your `.env`
+
+## Security Considerations
+
+### Webhook Signature Validation
+
+All providers support webhook signature validation to ensure requests are authentic:
+
+| Provider  | Validation Method | Required Config |
+|-----------|-------------------|-----------------|
+| AWS SES   | SNS certificate validation | Automatic |
+| Resend    | Svix HMAC-SHA256 | `webhook_secret` |
+| Mailgun   | HMAC-SHA256 | `webhook_signing_key` |
+| SendGrid  | ECDSA P-256 | `verification_key` |
+| Postmark  | Header token or Basic Auth | `webhook_token` |
+| Postal    | Header token | `webhook_key` |
+
+**Important**: In development, validation is skipped if no secret is configured. In production, always configure your webhook secrets.
+
+### Protecting Webhook Routes
+
+The webhook routes are public by default (no auth middleware). This is required because email providers need to access them. Security is provided through signature validation.
+
+If you need additional protection, you can:
+
+1. Configure IP allowlists in your web server (nginx/Apache)
+2. Add custom middleware in the config:
+
+```php
+// config/email-tracker.php
+'routes' => [
+    'middleware' => ['throttle:60,1'], // Rate limiting
+],
 ```
 
 ## Events
 
-The package dispatches events for all tracking actions:
-
-- `EmailSentEvent` - When an email is sent
-- `EmailDeliveryEvent` - When delivery is confirmed
-- `EmailBounceEvent` - When an email bounces
-- `EmailComplaintEvent` - When a complaint is received
-- `EmailOpenEvent` - When an email is opened
-- `EmailLinkClickEvent` - When a link is clicked
-
-Listen to these events in your `EventServiceProvider`:
+The package dispatches events for all tracking activities. Listen to these in your `EventServiceProvider`:
 
 ```php
+use R0bdiabl0\EmailTracker\Events\EmailSentEvent;
+use R0bdiabl0\EmailTracker\Events\EmailDeliveryEvent;
+use R0bdiabl0\EmailTracker\Events\EmailBounceEvent;
+use R0bdiabl0\EmailTracker\Events\EmailComplaintEvent;
+use R0bdiabl0\EmailTracker\Events\EmailOpenEvent;
+use R0bdiabl0\EmailTracker\Events\EmailLinkClickEvent;
+
 protected $listen = [
-    \R0bdiabl0\EmailTracker\Events\EmailBounceEvent::class => [
+    EmailBounceEvent::class => [
         \App\Listeners\HandleEmailBounce::class,
+    ],
+    EmailComplaintEvent::class => [
+        \App\Listeners\HandleEmailComplaint::class,
     ],
 ];
 ```
 
-## Email Validation
+### Example Listener
+
+```php
+namespace App\Listeners;
+
+use R0bdiabl0\EmailTracker\Events\EmailBounceEvent;
+
+class HandleEmailBounce
+{
+    public function handle(EmailBounceEvent $event): void
+    {
+        $bounce = $event->emailBounce;
+        $email = $bounce->email;
+        $type = $bounce->type; // 'Permanent' or 'Transient'
+
+        if ($type === 'Permanent') {
+            // Mark user as having invalid email
+            User::where('email', $email)->update(['email_valid' => false]);
+        }
+
+        // Log for monitoring
+        Log::warning("Email bounced", [
+            'email' => $email,
+            'type' => $type,
+            'provider' => $bounce->provider,
+        ]);
+    }
+}
+```
+
+## Pre-Send Validation
 
 Automatically skip sending to bounced or complained addresses:
 
 ```php
 // config/email-tracker.php
 'validation' => [
-    'skip_bounced' => true,
-    'skip_complained' => true,
+    'skip_bounced' => true,    // Skip permanently bounced addresses
+    'skip_complained' => true, // Skip addresses that filed complaints
 ],
 ```
 
-Or use the validator manually:
+Or validate manually:
 
 ```php
 use R0bdiabl0\EmailTracker\Services\EmailValidator;
 
+// Check if email should be blocked
 if (EmailValidator::shouldBlock('user@example.com')) {
-    // Don't send
+    return; // Don't send
 }
 
+// Get specific counts
 $bounceCount = EmailValidator::getBounceCount('user@example.com');
 $hasComplaint = EmailValidator::hasComplaint('user@example.com');
+
+// Filter a list of emails
+$validEmails = EmailValidator::filterBlockedEmails($emailList);
+```
+
+## Database Schema
+
+The package creates the following tables (with optional prefix):
+
+### sent_emails
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| provider | string | Email provider (ses, resend, etc.) |
+| message_id | string | Provider's message ID |
+| email | string | Recipient email address |
+| batch_id | bigint | Optional batch reference |
+| sent_at | timestamp | When email was sent |
+| delivered_at | timestamp | When delivery was confirmed |
+| bounce_tracking | boolean | Whether bounce tracking is enabled |
+| complaint_tracking | boolean | Whether complaint tracking is enabled |
+| delivery_tracking | boolean | Whether delivery tracking is enabled |
+
+### email_bounces
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| provider | string | Email provider |
+| sent_email_id | bigint | Reference to sent email |
+| type | string | Bounce type (Permanent/Transient) |
+| email | string | Bounced email address |
+| bounced_at | timestamp | When bounce occurred |
+
+### email_complaints
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| provider | string | Email provider |
+| sent_email_id | bigint | Reference to sent email |
+| type | string | Complaint type (spam, etc.) |
+| email | string | Complaining email address |
+| complained_at | timestamp | When complaint occurred |
+
+### email_opens
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| sent_email_id | bigint | Reference to sent email |
+| opened_at | timestamp | When email was opened |
+
+### email_links
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| sent_email_id | bigint | Reference to sent email |
+| original_url | text | Original link URL |
+| click_count | integer | Number of clicks |
+| clicked_at | timestamp | First click time |
+
+### batches
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint | Primary key |
+| name | string | Batch identifier |
+
+## Querying Data
+
+```php
+use R0bdiabl0\EmailTracker\Models\SentEmail;
+use R0bdiabl0\EmailTracker\Models\Batch;
+
+// Get all bounced emails
+$bounced = SentEmail::bounced()->get();
+
+// Get all emails that received complaints
+$complained = SentEmail::complained()->get();
+
+// Get emails by provider
+$sesEmails = SentEmail::forProvider('ses')->get();
+
+// Get delivered emails
+$delivered = SentEmail::delivered()->get();
+
+// Get emails for a specific address
+$userEmails = SentEmail::forEmail('user@example.com')->get();
+
+// Get batch with all emails
+$batch = Batch::where('name', 'campaign-2024')->with('sentEmails')->first();
+
+// Check if specific email bounced
+$email = SentEmail::where('message_id', $messageId)->first();
+if ($email->wasBounced()) {
+    // Handle bounce
+}
 ```
 
 ## Migrating from juhasev/laravel-ses
 
-If you're migrating from `juhasev/laravel-ses`, use the migration command:
+If you're migrating from `juhasev/laravel-ses`:
 
 ```bash
-# Preview changes
+# Preview what will change
 php artisan email-tracker:migrate-from-ses --dry-run
 
-# Run migration with backup
+# Run migration with table backup
 php artisan email-tracker:migrate-from-ses --backup
 
-# Also update code namespaces
+# Also update namespaces in your code
 php artisan email-tracker:migrate-from-ses --backup --update-code
 ```
 
-See [UPGRADE.md](UPGRADE.md) for detailed migration instructions.
+The migration will:
+- Rename tables (remove `laravel_ses_` prefix)
+- Add `provider` column with default `'ses'`
+- Output new webhook URLs for AWS SNS configuration
 
 ### Backwards Compatibility
 
-The `SesMail` facade is aliased to `EmailTracker` for backwards compatibility:
+The `SesMail` facade is aliased to `EmailTracker`:
 
 ```php
 // Still works!
@@ -240,76 +514,122 @@ Enable legacy routes to keep old webhook URLs working:
 EMAIL_TRACKER_LEGACY_ROUTES=true
 ```
 
-## Database Schema
-
-The package creates the following tables (with optional prefix):
-
-- `sent_emails` - Records of all sent emails
-- `email_opens` - Open tracking records
-- `email_bounces` - Bounce records
-- `email_complaints` - Complaint records
-- `email_links` - Link click tracking
-- `batches` - Batch groupings
-
-All tables include a `provider` column to track which email provider was used.
-
-## Statistics
-
-Query email statistics:
-
-```php
-use R0bdiabl0\EmailTracker\Models\SentEmail;
-
-// Get all bounced emails
-$bounced = SentEmail::bounced()->get();
-
-// Get emails by provider
-$sesEmails = SentEmail::forProvider('ses')->get();
-
-// Get emails by batch
-$batch = Batch::where('name', 'campaign-2024')->first();
-$batchEmails = $batch->sentEmails;
-```
-
 ## Extending
 
 ### Custom Providers
 
-Implement the `EmailProviderInterface` and register your provider:
+Implement `EmailProviderInterface` and register:
 
 ```php
-use R0bdiabl0\EmailTracker\Contracts\EmailProviderInterface;
-use R0bdiabl0\EmailTracker\Facades\EmailTracker;
+use R0bdiabl0\EmailTracker\Providers\AbstractProvider;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
-class CustomProvider implements EmailProviderInterface
+class CustomSmtpProvider extends AbstractProvider
 {
-    // Implement required methods...
+    public function getName(): string
+    {
+        return 'custom-smtp';
+    }
+
+    public function handleWebhook(Request $request, ?string $event = null): Response
+    {
+        // Parse and process webhook payload
+    }
+
+    public function parsePayload(array $payload): EmailEventData
+    {
+        // Convert to standardized format
+    }
+
+    public function validateSignature(Request $request): bool
+    {
+        // Verify webhook authenticity
+    }
 }
 
 // Register in a service provider
-EmailTracker::registerProvider('custom', CustomProvider::class);
+EmailTracker::registerProvider('custom-smtp', CustomSmtpProvider::class);
 ```
 
 ### Custom Models
 
-Override default models in the config:
+Override default models:
 
 ```php
+// config/email-tracker.php
 'models' => [
-    'sent_email' => \App\Models\SentEmail::class,
+    'sent_email' => \App\Models\TrackedEmail::class,
+    'email_bounce' => \App\Models\CustomBounce::class,
     // ...
 ],
+```
+
+Your custom model should extend the package model or implement the contract:
+
+```php
+namespace App\Models;
+
+use R0bdiabl0\EmailTracker\Models\SentEmail as BaseSentEmail;
+
+class TrackedEmail extends BaseSentEmail
+{
+    // Add custom methods or relationships
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'email', 'email');
+    }
+}
 ```
 
 ## Testing
 
 ```bash
+# Run tests
 composer test
+
+# Run with coverage
+composer test-coverage
+
+# Static analysis
+composer analyse
+
+# Code formatting
+composer format
 ```
+
+## Troubleshooting
+
+### Webhooks not receiving data
+
+1. Verify the webhook URL is accessible from the internet
+2. Check your web server logs for incoming requests
+3. Enable debug logging: `EMAIL_TRACKER_DEBUG=true`
+4. Verify signature validation secrets are correct
+5. Check Laravel logs for validation errors
+
+### Open tracking not working
+
+1. Open tracking requires HTML emails (not plain text)
+2. Many email clients block tracking pixels by default
+3. Gmail, Apple Mail, and others may proxy images
+4. Consider open tracking as approximate data only
+
+### Message IDs not matching
+
+1. Ensure you're storing the message ID from the send response
+2. Different providers format message IDs differently
+3. Check that the same message ID format is used in webhooks
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Run `composer test` and `composer analyse`
+5. Submit a pull request
 
 ## License
 

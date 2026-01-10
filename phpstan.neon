@@ -7,16 +7,26 @@ parameters:
         - src
     tmpDir: .phpstan.cache
     reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
     ignoreErrors:
         # Laravel Eloquent magic methods
         - message: '#Call to an undefined static method Illuminate\\Database\\Eloquent\\Model::#'
           path: src/
-        # Laravel Model dynamic properties
-        - message: '#Access to an undefined property#'
-          path: src/Models/
+        # Laravel Model dynamic properties (accessed via ModelResolver)
+        - message: '#Access to an undefined property Illuminate\\Database\\Eloquent\\Model::#'
+          path: src/
+        # Laravel Model dynamic properties on our model classes
+        - message: '#Access to an undefined property R0bdiabl0\\EmailTracker\\Models\\.*::\$#'
+          path: src/
+        # Laravel Model methods (setDeliveredAt, etc. - called via ModelResolver which returns Model base type)
+        - message: '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::#'
+          path: src/Providers/
         # ModelResolver returns class strings
         - message: '#Template type T of method R0bdiabl0\\EmailTracker\\ModelResolver#'
           path: src/ModelResolver.php
         # Traits not directly analysed
         - message: '#Trait .* is used zero times and is not analysed#'
           path: src/Traits/
+        # Event constructors expect contracts but get models via ModelResolver
+        - message: '#Parameter .* of class R0bdiabl0\\EmailTracker\\Events\\.* constructor expects R0bdiabl0\\EmailTracker\\Contracts\\.*Contract, Illuminate\\Database\\Eloquent\\Model given#'
+          path: src/Providers/

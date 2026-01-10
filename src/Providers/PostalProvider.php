@@ -4,11 +4,25 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Providers;
 
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use R0bdiabl0\EmailTracker\DataTransferObjects\EmailEventData;
 use R0bdiabl0\EmailTracker\Enums\EmailEventType;
+use R0bdiabl0\EmailTracker\Events\EmailBounceEvent;
+use R0bdiabl0\EmailTracker\Events\EmailDeliveryEvent;
+use R0bdiabl0\EmailTracker\ModelResolver;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Postal webhook provider.
+ *
+ * Postal is an open-source mail delivery platform.
+ *
+ * @see https://docs.postalserver.io/developer/webhooks
+ */
 class PostalProvider extends AbstractProvider
 {
     public function getName(): string
@@ -18,29 +32,154 @@ class PostalProvider extends AbstractProvider
 
     /**
      * Handle incoming webhook from Postal.
+     *
+     * Postal webhook events:
+     * - MessageSent: Message was accepted by Postal
+     * - MessageDelivered: Message was delivered to recipient's mail server
+     * - MessageDelayed: Message delivery is delayed (temporary failure)
+     * - MessageBounced: Message bounced (hard bounce)
+     * - MessageHeld: Message was held for review
+     * - MessageLinkClicked: Recipient clicked a link
      */
     public function handleWebhook(Request $request, ?string $event = null): Response
     {
-        // Validate webhook
+        $this->logRawPayload($request);
+
+        // Validate webhook key
         if (! $this->validateSignature($request)) {
+            $this->logError('Webhook signature validation failed');
+
             return response()->json(['success' => false, 'error' => 'Invalid signature'], 403);
         }
 
         $payload = $request->all();
-        $this->logRawPayload($request);
-
         $eventType = $payload['event'] ?? $event ?? 'unknown';
 
-        // TODO: Implement Postal webhook handling
-        // Postal events: MessageSent, MessageDelivered, MessageDelayed,
-        // MessageBounced, MessageHeld, MessageLinkClicked
+        $this->logDebug("Processing Postal event: {$eventType}");
 
-        $this->logDebug("Received Postal event: {$eventType}");
+        return match ($eventType) {
+            'MessageBounced' => $this->handleBounce($payload),
+            'MessageDelivered' => $this->handleDelivery($payload),
+            'MessageSent', 'MessageDelayed', 'MessageHeld', 'MessageLinkClicked' => $this->handleGenericEvent($payload, $eventType),
+            default => response()->json(['success' => true, 'message' => 'Event type not tracked']),
+        };
+    }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Webhook received (Postal handler not fully implemented)',
-        ]);
+    /**
+     * Handle bounce event.
+     */
+    protected function handleBounce(array $payload): JsonResponse
+    {
+        $message = $payload['message'] ?? [];
+        $messageId = $message['id'] ?? $message['message_id'] ?? null;
+
+        if (! $messageId) {
+            $this->logError('Bounce notification missing message ID');
+
+            return response()->json(['success' => false, 'error' => 'Missing message ID'], 400);
+        }
+
+        try {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $messageId)
+                ->where('bounce_tracking', true)
+                ->firstOrFail();
+
+            $email = $message['rcpt_to'] ?? '';
+
+            $emailBounce = ModelResolver::get('email_bounce')::create([
+                'provider' => $this->getName(),
+                'sent_email_id' => $sentEmail->id,
+                'type' => $this->determineBounceType($payload),
+                'email' => $email,
+                'bounced_at' => isset($payload['timestamp']) ? Carbon::createFromTimestamp($payload['timestamp']) : now(),
+            ]);
+
+            event(new EmailBounceEvent($emailBounce));
+
+            $this->logDebug("Bounce processed for: {$email}");
+
+            return response()->json(['success' => true, 'message' => 'Bounce processed']);
+        } catch (ModelNotFoundException) {
+            $this->logDebug("Message ID ({$messageId}) not found or bounce tracking disabled. Skipping...");
+
+            return response()->json(['success' => true, 'message' => 'Message not tracked']);
+        } catch (Exception $e) {
+            $this->logError("Failed to process bounce: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'error' => 'Processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle delivery event.
+     */
+    protected function handleDelivery(array $payload): JsonResponse
+    {
+        $message = $payload['message'] ?? [];
+        $messageId = $message['id'] ?? $message['message_id'] ?? null;
+
+        if (! $messageId) {
+            $this->logError('Delivery notification missing message ID');
+
+            return response()->json(['success' => false, 'error' => 'Missing message ID'], 400);
+        }
+
+        try {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $messageId)
+                ->where('delivery_tracking', true)
+                ->firstOrFail();
+
+            $timestamp = isset($payload['timestamp']) ? Carbon::createFromTimestamp($payload['timestamp']) : now();
+            $sentEmail->setDeliveredAt($timestamp);
+
+            event(new EmailDeliveryEvent($sentEmail));
+
+            $this->logDebug("Delivery processed for message: {$messageId}");
+
+            return response()->json(['success' => true, 'message' => 'Delivery processed']);
+        } catch (ModelNotFoundException) {
+            $this->logDebug("Message ID ({$messageId}) not found or delivery tracking disabled. Skipping...");
+
+            return response()->json(['success' => true, 'message' => 'Message not tracked']);
+        } catch (Exception $e) {
+            $this->logError("Failed to process delivery: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'error' => 'Processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle generic events - log only for now.
+     */
+    protected function handleGenericEvent(array $payload, string $eventType): JsonResponse
+    {
+        $message = $payload['message'] ?? [];
+        $messageId = $message['id'] ?? $message['message_id'] ?? 'unknown';
+
+        $this->logDebug("Received {$eventType} event for message: {$messageId}");
+
+        return response()->json(['success' => true, 'message' => "Event {$eventType} acknowledged"]);
+    }
+
+    /**
+     * Determine bounce type from Postal payload.
+     */
+    protected function determineBounceType(array $payload): string
+    {
+        // Postal bounces are typically hard bounces
+        $output = $payload['output'] ?? '';
+
+        if (str_contains(strtolower($output), 'permanent') || str_contains(strtolower($output), '550')) {
+            return 'Permanent';
+        }
+
+        if (str_contains(strtolower($output), 'temporary') || str_contains(strtolower($output), '451')) {
+            return 'Transient';
+        }
+
+        return 'Permanent';
     }
 
     /**
@@ -48,32 +187,42 @@ class PostalProvider extends AbstractProvider
      */
     public function parsePayload(array $payload): EmailEventData
     {
+        $message = $payload['message'] ?? [];
+
         return new EmailEventData(
-            messageId: $payload['message']['id'] ?? '',
-            email: $payload['message']['rcpt_to'] ?? '',
+            messageId: $message['id'] ?? $message['message_id'] ?? '',
+            email: $message['rcpt_to'] ?? '',
             provider: $this->getName(),
             eventType: $this->mapEventType($payload['event'] ?? 'unknown'),
-            timestamp: isset($payload['timestamp']) ? \Carbon\Carbon::createFromTimestamp($payload['timestamp']) : null,
+            timestamp: isset($payload['timestamp']) ? Carbon::createFromTimestamp($payload['timestamp']) : null,
             metadata: $payload,
         );
     }
 
     /**
      * Validate the webhook request signature.
+     *
+     * Postal uses a simple header-based validation with a shared key.
      */
     public function validateSignature(Request $request): bool
     {
         $webhookKey = $this->getConfig('webhook_key');
 
         if (! $webhookKey) {
-            // If no key configured, skip validation
+            // If no key configured, skip validation (development mode)
             return true;
         }
 
-        // Postal uses a simple key-based validation
+        // Postal sends the key in the X-Postal-Webhook-Key header
         $providedKey = $request->header('X-Postal-Webhook-Key');
 
-        return $providedKey && hash_equals($webhookKey, $providedKey);
+        if (! $providedKey) {
+            $this->logError('Missing X-Postal-Webhook-Key header');
+
+            return false;
+        }
+
+        return hash_equals($webhookKey, $providedKey);
     }
 
     /**
