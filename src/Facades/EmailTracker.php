@@ -24,6 +24,7 @@ use R0bdiabl0\EmailTracker\TrackedMailer;
  * @method static TrackedMailer disableDeliveryTracking()
  * @method static TrackedMailer setBatch(string $batch)
  * @method static TrackedMailer setProvider(string $provider)
+ * @method static TrackedMailer provider(string $provider)
  * @method static TrackedMailer useInitMessageCallback(\Closure $callback)
  * @method static BatchContract|null getBatch()
  * @method static int|null getBatchId()

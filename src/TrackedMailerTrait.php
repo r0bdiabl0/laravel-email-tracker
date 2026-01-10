@@ -77,6 +77,14 @@ trait TrackedMailerTrait
     }
 
     /**
+     * Alias for setProvider() - fluent API convenience.
+     */
+    public function provider(string $provider): self
+    {
+        return $this->setProvider($provider);
+    }
+
+    /**
      * Get the current provider name.
      */
     public function getProvider(): string

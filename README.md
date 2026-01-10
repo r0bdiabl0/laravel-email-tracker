@@ -162,6 +162,49 @@ Enable only the providers you use:
 ],
 ```
 
+### Using Multiple Providers
+
+You can enable multiple providers simultaneously and switch between them per-send:
+
+```env
+# Set your default provider
+EMAIL_TRACKER_DEFAULT_PROVIDER=ses
+
+# Enable multiple providers
+EMAIL_TRACKER_SES_ENABLED=true
+EMAIL_TRACKER_RESEND_ENABLED=true
+EMAIL_TRACKER_MAILGUN_ENABLED=true
+```
+
+```php
+use R0bdiabl0\EmailTracker\Facades\EmailTracker;
+
+// Uses the default provider (from EMAIL_TRACKER_DEFAULT_PROVIDER)
+EmailTracker::enableAllTracking()
+    ->to('user@example.com')
+    ->send(new WelcomeMail($user));
+
+// Override to use a specific provider for this send
+EmailTracker::provider('resend')
+    ->enableAllTracking()
+    ->to('user@example.com')
+    ->send(new WelcomeMail($user));
+
+// Use Mailgun for transactional emails
+EmailTracker::provider('mailgun')
+    ->enableAllTracking()
+    ->to('user@example.com')
+    ->send(new OrderConfirmation($order));
+```
+
+Each provider has its own webhook endpoint. When you receive bounce/complaint notifications, they'll be routed to the correct handler based on the URL:
+- SES: `POST /email-tracker/webhook/ses`
+- Resend: `POST /email-tracker/webhook/resend`
+- Mailgun: `POST /email-tracker/webhook/mailgun`
+- etc.
+
+The `provider` column in the database tracks which service sent each email, allowing you to query statistics by provider.
+
 ## Basic Usage
 
 ### Sending Tracked Emails
