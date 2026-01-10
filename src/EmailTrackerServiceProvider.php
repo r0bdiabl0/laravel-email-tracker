@@ -31,6 +31,10 @@ class EmailTrackerServiceProvider extends ServiceProvider
                 $app->make('events'),
             );
 
+            // Set the default provider from config
+            $defaultProvider = $app->make('config')->get('email-tracker.default_provider', 'ses');
+            $mailer->setProvider($defaultProvider);
+
             // Set the global from address if configured
             $fromAddress = $app->make('config')->get('mail.from.address');
             $fromName = $app->make('config')->get('mail.from.name');
