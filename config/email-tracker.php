@@ -28,8 +28,8 @@ return [
     |
     | Examples:
     | - '' (empty) -> sent_emails, email_bounces, etc.
-    | - 'tracker_' -> tracker_sent_emails, tracker_email_bounces, etc.
-    | - 'email_' -> email_sent_emails, email_email_bounces, etc.
+    | - 'tracker' -> tracker_sent_emails, tracker_email_bounces, etc.
+    | - 'mail' -> mail_sent_emails, mail_email_bounces, etc.
     |
     */
 

@@ -113,15 +113,15 @@ EMAIL_TRACKER_POSTMARK_ENABLED=false
 # Webhook signing secrets (provider-specific)
 # AWS SES: Uses SNS certificate validation (automatic)
 # Resend: Uses Svix webhook signatures
-EMAIL_TRACKER_RESEND_WEBHOOK_SECRET=whsec_...
+RESEND_WEBHOOK_SECRET=whsec_...
 # Mailgun: HMAC-SHA256 with your signing key
-EMAIL_TRACKER_MAILGUN_WEBHOOK_SIGNING_KEY=key-...
+MAILGUN_WEBHOOK_SIGNING_KEY=key-...
 # SendGrid: ECDSA verification key (public key in PEM format)
-EMAIL_TRACKER_SENDGRID_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----..."
+SENDGRID_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----..."
 # Postal: Simple shared key in X-Postal-Webhook-Key header
-EMAIL_TRACKER_POSTAL_WEBHOOK_KEY=your-secret-key
+POSTAL_WEBHOOK_KEY=your-secret-key
 # Postmark: Token in X-Postmark-Webhook-Token header or Basic auth
-EMAIL_TRACKER_POSTMARK_WEBHOOK_TOKEN=your-token
+POSTMARK_WEBHOOK_TOKEN=your-token
 ```
 
 ### Table Names
@@ -134,7 +134,7 @@ By default, tables are created without a prefix:
 - `email_links`
 - `batches`
 
-With a prefix like `tracker_`:
+With a prefix like `tracker`:
 - `tracker_sent_emails`
 - `tracker_email_bounces`
 - etc.
@@ -152,11 +152,11 @@ Enable only the providers you use:
     ],
     'resend' => [
         'enabled' => env('EMAIL_TRACKER_RESEND_ENABLED', false),
-        'webhook_secret' => env('EMAIL_TRACKER_RESEND_WEBHOOK_SECRET'),
+        'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),
     ],
     'mailgun' => [
         'enabled' => env('EMAIL_TRACKER_MAILGUN_ENABLED', false),
-        'webhook_signing_key' => env('EMAIL_TRACKER_MAILGUN_WEBHOOK_SIGNING_KEY'),
+        'webhook_signing_key' => env('MAILGUN_WEBHOOK_SIGNING_KEY'),
     ],
     // ... etc.
 ],
@@ -374,6 +374,28 @@ If you need additional protection, you can:
 ],
 ```
 
+### CSRF Protection
+
+Webhook routes must be excluded from CSRF protection since they receive POST requests from external services. The package routes are loaded outside the `web` middleware group, but if your application applies CSRF middleware globally, you need to exclude the webhook routes.
+
+Add to your `bootstrap/app.php` (Laravel 11+):
+
+```php
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->validateCsrfTokens(except: [
+        'email-tracker/webhook/*',
+    ]);
+})
+```
+
+Or in `app/Http/Middleware/VerifyCsrfToken.php` (Laravel 10):
+
+```php
+protected $except = [
+    'email-tracker/webhook/*',
+];
+```
+
 ## Events
 
 The package dispatches events for all tracking activities. Listen to these in your `EventServiceProvider`:
@@ -503,6 +525,7 @@ The package creates the following tables (with optional prefix):
 |--------|------|-------------|
 | id | bigint | Primary key |
 | sent_email_id | bigint | Reference to sent email |
+| beacon_identifier | string | Unique identifier for tracking pixel |
 | opened_at | timestamp | When email was opened |
 
 ### email_links
@@ -511,9 +534,10 @@ The package creates the following tables (with optional prefix):
 |--------|------|-------------|
 | id | bigint | Primary key |
 | sent_email_id | bigint | Reference to sent email |
+| link_identifier | string | Unique identifier for link tracking |
 | original_url | text | Original link URL |
+| clicked | boolean | Whether link has been clicked |
 | click_count | integer | Number of clicks |
-| clicked_at | timestamp | First click time |
 
 ### batches
 
@@ -684,11 +708,11 @@ class CustomSmtpProvider extends AbstractProvider
         $data = $this->parsePayload($payload);
 
         // Route to appropriate handler based on event type
-        // The base class handlers expect EmailEventData objects
+        // The base class helpers expect EmailEventData objects
         return match ($eventType) {
-            'bounce' => $this->handleBounce($data),
-            'complaint' => $this->handleComplaint($data),
-            'delivered' => $this->handleDelivery($data),
+            'bounce' => $this->processBounceEvent($data),
+            'complaint' => $this->processComplaintEvent($data),
+            'delivered' => $this->processDeliveryEvent($data),
             default => response()->json(['success' => true]),
         };
     }
@@ -805,12 +829,12 @@ $this->logRawPayload($request); // Log full webhook payload
 // Configuration access
 $secret = $this->getConfig('webhook_secret');
 
-// Standard event handlers - pass an EmailEventData object
+// Event processing helpers - pass an EmailEventData object
 // These create database records and fire events automatically
 $data = $this->parsePayload($payload);  // You implement this
-$this->handleBounce($data);             // Creates EmailBounce record
-$this->handleComplaint($data);          // Creates EmailComplaint record
-$this->handleDelivery($data);           // Updates SentEmail.delivered_at
+$this->processBounceEvent($data);       // Creates EmailBounce record
+$this->processComplaintEvent($data);    // Creates EmailComplaint record
+$this->processDeliveryEvent($data);     // Updates SentEmail.delivered_at
 ```
 
 **Example using the helper methods in your handleWebhook():**
@@ -830,11 +854,11 @@ public function handleWebhook(Request $request, ?string $event = null): Response
     // Parse into standardized format
     $data = $this->parsePayload($payload);
 
-    // Use base class handlers
+    // Use base class event processors
     return match ($eventType) {
-        'bounce' => $this->handleBounce($data),
-        'complaint' => $this->handleComplaint($data),
-        'delivered' => $this->handleDelivery($data),
+        'bounce' => $this->processBounceEvent($data),
+        'complaint' => $this->processComplaintEvent($data),
+        'delivered' => $this->processDeliveryEvent($data),
         default => response()->json(['success' => true]),
     };
 }

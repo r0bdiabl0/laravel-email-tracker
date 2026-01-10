@@ -78,17 +78,33 @@ class SentEmail extends Model implements SentEmailContract
 
     // Scopes
 
+    /**
+     * Scope to filter by provider.
+     *
+     * @param  Builder<SentEmail>  $query
+     *
+     * @return Builder<SentEmail>
+     */
     public function scopeForProvider(Builder $query, string $provider): Builder
     {
         return $query->where('provider', $provider);
     }
 
+    /**
+     * Scope to filter by recipient email address.
+     *
+     * @param  Builder<SentEmail>  $query
+     *
+     * @return Builder<SentEmail>
+     */
     public function scopeForEmail(Builder $query, string $email): Builder
     {
         return $query->where('email', $email);
     }
 
     /**
+     * Scope to filter for delivered emails.
+     *
      * @param  Builder<SentEmail>  $query
      *
      * @return Builder<SentEmail>
@@ -100,6 +116,8 @@ class SentEmail extends Model implements SentEmailContract
     }
 
     /**
+     * Scope to filter for undelivered emails.
+     *
      * @param  Builder<SentEmail>  $query
      *
      * @return Builder<SentEmail>
@@ -110,11 +128,25 @@ class SentEmail extends Model implements SentEmailContract
         return $query->whereNull('delivered_at');
     }
 
+    /**
+     * Scope to filter for bounced emails.
+     *
+     * @param  Builder<SentEmail>  $query
+     *
+     * @return Builder<SentEmail>
+     */
     public function scopeBounced(Builder $query): Builder
     {
         return $query->whereHas('emailBounce');
     }
 
+    /**
+     * Scope to filter for emails with complaints.
+     *
+     * @param  Builder<SentEmail>  $query
+     *
+     * @return Builder<SentEmail>
+     */
     public function scopeComplained(Builder $query): Builder
     {
         return $query->whereHas('emailComplaint');

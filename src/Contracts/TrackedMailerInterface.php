@@ -21,6 +21,10 @@ interface TrackedMailerInterface
 
     public function setBatch(string $batch): self;
 
+    public function setProvider(string $provider): self;
+
+    public function getProvider(): string;
+
     public function useInitMessageCallback(Closure $callback): self;
 
     public function enableAllTracking(): self;
@@ -35,8 +39,6 @@ interface TrackedMailerInterface
 
     public function enableDeliveryTracking(): self;
 
-    public function enableRejectTracking(): self;
-
     public function disableAllTracking(): self;
 
     public function disableOpenTracking(): self;
@@ -48,6 +50,4 @@ interface TrackedMailerInterface
     public function disableComplaintTracking(): self;
 
     public function disableDeliveryTracking(): self;
-
-    public function disableRejectTracking(): self;
 }

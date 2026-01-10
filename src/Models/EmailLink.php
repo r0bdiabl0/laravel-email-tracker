@@ -39,6 +39,11 @@ class EmailLink extends Model implements EmailLinkContract
 
     // Scopes
 
+    public function scopeLinkIdentifier(Builder $query, string $linkIdentifier): Builder
+    {
+        return $query->where('link_identifier', $linkIdentifier);
+    }
+
     public function scopeClicked(Builder $query): Builder
     {
         return $query->where('clicked', true);

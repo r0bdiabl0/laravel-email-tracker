@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Providers;
 
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -86,14 +85,14 @@ abstract class AbstractProvider implements EmailProviderInterface
     }
 
     /**
-     * Handle a bounce event - creates an EmailBounce record.
+     * Process a bounce event - creates an EmailBounce record.
      *
-     * Override this method in your provider to customize bounce handling,
-     * or call it from your handleWebhook() method with parsed data.
+     * Call this from your handleWebhook() method with parsed data.
+     * This is a helper method for custom providers.
      *
      * @param  EmailEventData  $data  Parsed event data
      */
-    protected function handleBounce(EmailEventData $data): JsonResponse
+    protected function processBounceEvent(EmailEventData $data): JsonResponse
     {
         if (! $data->messageId) {
             $this->logError('Bounce notification missing message ID');
@@ -132,14 +131,14 @@ abstract class AbstractProvider implements EmailProviderInterface
     }
 
     /**
-     * Handle a complaint event - creates an EmailComplaint record.
+     * Process a complaint event - creates an EmailComplaint record.
      *
-     * Override this method in your provider to customize complaint handling,
-     * or call it from your handleWebhook() method with parsed data.
+     * Call this from your handleWebhook() method with parsed data.
+     * This is a helper method for custom providers.
      *
      * @param  EmailEventData  $data  Parsed event data
      */
-    protected function handleComplaint(EmailEventData $data): JsonResponse
+    protected function processComplaintEvent(EmailEventData $data): JsonResponse
     {
         if (! $data->messageId) {
             $this->logError('Complaint notification missing message ID');
@@ -178,14 +177,14 @@ abstract class AbstractProvider implements EmailProviderInterface
     }
 
     /**
-     * Handle a delivery event - updates the SentEmail.delivered_at timestamp.
+     * Process a delivery event - updates the SentEmail.delivered_at timestamp.
      *
-     * Override this method in your provider to customize delivery handling,
-     * or call it from your handleWebhook() method with parsed data.
+     * Call this from your handleWebhook() method with parsed data.
+     * This is a helper method for custom providers.
      *
      * @param  EmailEventData  $data  Parsed event data
      */
-    protected function handleDelivery(EmailEventData $data): JsonResponse
+    protected function processDeliveryEvent(EmailEventData $data): JsonResponse
     {
         if (! $data->messageId) {
             $this->logError('Delivery notification missing message ID');

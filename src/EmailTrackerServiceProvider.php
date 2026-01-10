@@ -90,13 +90,15 @@ class EmailTrackerServiceProvider extends ServiceProvider
 
     /**
      * Register provider handlers from config.
+     *
+     * Uses Laravel's IoC container for full dependency injection support.
      */
     protected function registerProviders(): void
     {
         foreach (config('email-tracker.providers', []) as $name => $settings) {
             if (($settings['enabled'] ?? false) && isset($settings['handler'])) {
-                $this->app->singleton("email-tracker.provider.{$name}", function () use ($settings) {
-                    return new $settings['handler'];
+                $this->app->singleton("email-tracker.provider.{$name}", function ($app) use ($settings) {
+                    return $app->make($settings['handler']);
                 });
             }
         }

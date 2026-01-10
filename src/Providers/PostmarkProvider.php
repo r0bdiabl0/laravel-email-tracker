@@ -137,6 +137,7 @@ class PostmarkProvider extends AbstractProvider
                 'sent_email_id' => $sentEmail->id,
                 'type' => 'spam',
                 'email' => $email,
+                // SpamComplaint uses 'BouncedAt' in Postmark's payload (same field name as bounces)
                 'complained_at' => isset($payload['BouncedAt']) ? Carbon::parse($payload['BouncedAt']) : now(),
             ]);
 
@@ -289,6 +290,7 @@ class PostmarkProvider extends AbstractProvider
             eventType: $this->mapEventType($payload['RecordType'] ?? 'unknown'),
             timestamp: $timestamp,
             bounceType: $this->determineBounceType($payload),
+            complaintType: ($payload['RecordType'] ?? '') === 'SpamComplaint' ? 'spam' : null,
             metadata: $payload,
         );
     }

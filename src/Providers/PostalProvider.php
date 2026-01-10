@@ -21,6 +21,10 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Postal is an open-source mail delivery platform.
  *
+ * Note: Postal does not support spam complaint webhooks. If you need complaint
+ * tracking, consider using a provider like SES, Postmark, or SendGrid that
+ * receives feedback loop reports from ISPs.
+ *
  * @see https://docs.postalserver.io/developer/webhooks
  */
 class PostalProvider extends AbstractProvider
@@ -195,6 +199,7 @@ class PostalProvider extends AbstractProvider
             provider: $this->getName(),
             eventType: $this->mapEventType($payload['event'] ?? 'unknown'),
             timestamp: isset($payload['timestamp']) ? Carbon::createFromTimestamp($payload['timestamp']) : null,
+            bounceType: $this->determineBounceType($payload),
             metadata: $payload,
         );
     }

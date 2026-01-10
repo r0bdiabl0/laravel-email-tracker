@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace R0bdiabl0\EmailTracker;
 
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 class ModelResolver
 {
@@ -15,6 +16,8 @@ class ModelResolver
      *
      * @param  string  $model  The model type key (e.g., 'sent_email', 'batch')
      *
+     * @throws InvalidArgumentException If the model key is not configured
+     *
      * @return class-string<T>
      */
     public static function get(string $model): string
@@ -22,7 +25,15 @@ class ModelResolver
         // Normalize model key (support both camelCase and snake_case)
         $key = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $model));
 
-        return config("email-tracker.models.{$key}");
+        $class = config("email-tracker.models.{$key}");
+
+        if ($class === null) {
+            throw new InvalidArgumentException(
+                "Unknown model type '{$model}'. Available types: sent_email, email_bounce, email_complaint, email_open, email_link, batch",
+            );
+        }
+
+        return $class;
     }
 
     /**

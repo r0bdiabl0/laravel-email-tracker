@@ -20,13 +20,13 @@ parameters:
           path: src/
         # Laravel Model methods (setDeliveredAt, etc. - called via ModelResolver which returns Model base type)
         - message: '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::#'
-          path: src/Providers/
+          path: src/
         # ModelResolver returns class strings
         - message: '#Template type T of method R0bdiabl0\\EmailTracker\\ModelResolver#'
           path: src/ModelResolver.php
         # Traits not directly analysed
         - message: '#Trait .* is used zero times and is not analysed#'
           path: src/Traits/
-        # Event constructors expect contracts but get models via ModelResolver
-        - message: '#Parameter .* of class R0bdiabl0\\EmailTracker\\Events\\.* constructor expects R0bdiabl0\\EmailTracker\\Contracts\\.*Contract, Illuminate\\Database\\Eloquent\\Model given#'
-          path: src/Providers/
+        # Event constructors and sendEvent methods expect contracts but get models via ModelResolver
+        - message: '#Parameter .* expects R0bdiabl0\\EmailTracker\\Contracts\\.*Contract, Illuminate\\Database\\Eloquent\\Model given#'
+          path: src/

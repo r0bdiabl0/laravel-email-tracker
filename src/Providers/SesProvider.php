@@ -8,7 +8,6 @@ use Aws\Sns\Exception\InvalidSnsMessageException;
 use Aws\Sns\Message;
 use Aws\Sns\MessageValidator;
 use Exception;
-use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -191,7 +190,7 @@ class SesProvider extends AbstractProvider
     /**
      * Handle SNS subscription confirmation.
      *
-     * @throws GuzzleException
+     * @throws \Illuminate\Http\Client\ConnectionException
      * @throws RuntimeException
      */
     protected function handleSubscriptionConfirmation(Message $message): JsonResponse
@@ -246,8 +245,9 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::whereMessageId($messageId)
-                ->whereBounceTracking(true)
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $messageId)
+                ->where('bounce_tracking', true)
                 ->firstOrFail();
 
             $bouncedRecipients = $bounce['bouncedRecipients'] ?? [];
@@ -267,7 +267,7 @@ class SesProvider extends AbstractProvider
 
             return response()->json(['success' => true, 'message' => 'Bounce processed']);
 
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException) {
             $this->logDebug("Message ID ({$messageId}) not found or bounce tracking disabled. Skipping...");
 
             return response()->json(['success' => true, 'message' => 'Message not tracked']);
@@ -295,8 +295,9 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::whereMessageId($messageId)
-                ->whereComplaintTracking(true)
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $messageId)
+                ->where('complaint_tracking', true)
                 ->firstOrFail();
 
             $complainedRecipients = $complaint['complainedRecipients'] ?? [];
@@ -316,7 +317,7 @@ class SesProvider extends AbstractProvider
 
             return response()->json(['success' => true, 'message' => 'Complaint processed']);
 
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException) {
             $this->logDebug("Message ID ({$messageId}) not found or complaint tracking disabled. Skipping...");
 
             return response()->json(['success' => true, 'message' => 'Message not tracked']);
@@ -344,8 +345,9 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::whereMessageId($messageId)
-                ->whereDeliveryTracking(true)
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $messageId)
+                ->where('delivery_tracking', true)
                 ->firstOrFail();
 
             $timestamp = $delivery['timestamp'] ?? null;
@@ -357,7 +359,7 @@ class SesProvider extends AbstractProvider
 
             return response()->json(['success' => true, 'message' => 'Delivery processed']);
 
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException) {
             $this->logDebug("Message ID ({$messageId}) not found or delivery tracking disabled. Skipping...");
 
             return response()->json(['success' => true, 'message' => 'Message not tracked']);

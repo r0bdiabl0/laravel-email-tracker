@@ -21,8 +21,6 @@ trait TrackingTrait
 
     protected bool $deliveryTracking = false;
 
-    protected bool $rejectTracking = false;
-
     protected ?BatchContract $batch = null;
 
     /**
@@ -49,19 +47,10 @@ trait TrackingTrait
 
     /**
      * Set the batch for email grouping.
-     *
-     * @throws Exception
      */
     public function setBatch(string $batch): TrackedMailerInterface
     {
-        $batchModel = ModelResolver::query('batch');
-        $batchResult = $batchModel->where('name', $batch)->first();
-
-        if (! $batchResult) {
-            $batchResult = ModelResolver::get('batch')::create(['name' => $batch]);
-        }
-
-        $this->batch = $batchResult;
+        $this->batch = ModelResolver::get('batch')::firstOrCreate(['name' => $batch]);
 
         return $this;
     }
@@ -111,13 +100,6 @@ trait TrackingTrait
         return $this;
     }
 
-    public function enableRejectTracking(): TrackedMailerInterface
-    {
-        $this->rejectTracking = true;
-
-        return $this;
-    }
-
     public function disableOpenTracking(): TrackedMailerInterface
     {
         $this->openTracking = false;
@@ -153,13 +135,6 @@ trait TrackingTrait
         return $this;
     }
 
-    public function disableRejectTracking(): TrackedMailerInterface
-    {
-        $this->rejectTracking = false;
-
-        return $this;
-    }
-
     public function enableAllTracking(): TrackedMailerInterface
     {
         return $this->enableOpenTracking()
@@ -186,7 +161,6 @@ trait TrackingTrait
             'bounceTracking' => $this->bounceTracking,
             'complaintTracking' => $this->complaintTracking,
             'deliveryTracking' => $this->deliveryTracking,
-            'rejectTracking' => $this->rejectTracking,
         ];
     }
 }

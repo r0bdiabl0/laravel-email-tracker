@@ -60,12 +60,16 @@ class EmailTracker extends Facade
      *
      * This registers the handler class AND enables the provider in config
      * so that webhooks will be routed correctly.
+     *
+     * The provider class supports full constructor dependency injection -
+     * any dependencies type-hinted in your provider's constructor will be
+     * automatically resolved from Laravel's service container.
      */
     public static function registerProvider(string $name, string $handlerClass, array $config = []): void
     {
-        // Register the handler singleton
-        app()->singleton("email-tracker.provider.{$name}", function () use ($handlerClass) {
-            return new $handlerClass;
+        // Register the handler singleton with full DI support
+        app()->singleton("email-tracker.provider.{$name}", function ($app) use ($handlerClass) {
+            return $app->make($handlerClass);
         });
 
         // Also set the provider as enabled in config so webhooks work

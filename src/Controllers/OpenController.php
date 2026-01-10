@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Controllers;
 
-use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -20,24 +19,31 @@ class OpenController extends Controller
     /**
      * Track email open via beacon pixel.
      *
-     * @throws Exception
+     * Only the first open is recorded. Subsequent opens are acknowledged
+     * but do not update the timestamp or fire events.
      */
     public function track(string $beaconIdentifier): JsonResponse|Response
     {
         try {
-            $emailOpen = ModelResolver::get('email_open')::whereBeaconIdentifier($beaconIdentifier)->firstOrFail();
-            $emailOpen->opened_at = Carbon::now();
-            $emailOpen->save();
+            $emailOpen = ModelResolver::get('email_open')::query()
+                ->where('beacon_identifier', $beaconIdentifier)
+                ->firstOrFail();
 
-            $this->sendEvent($emailOpen);
+            // Only record first open
+            if ($emailOpen->opened_at === null) {
+                $emailOpen->opened_at = Carbon::now();
+                $emailOpen->save();
 
-        } catch (ModelNotFoundException $e) {
+                $this->sendEvent($emailOpen);
+            }
+
+        } catch (ModelNotFoundException) {
             $logPrefix = config('email-tracker.log_prefix', 'EMAIL-TRACKER');
             Log::info("{$logPrefix} Could not find sent email with beacon identifier ({$beaconIdentifier}). Email open could not be recorded!");
 
             return response()->json([
                 'success' => false,
-                'errors' => ['Invalid Beacon'],
+                'error' => 'Invalid Beacon',
             ], 404);
         }
 

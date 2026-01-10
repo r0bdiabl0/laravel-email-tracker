@@ -38,6 +38,11 @@ class EmailOpen extends Model implements EmailOpenContract
 
     // Scopes
 
+    public function scopeBeaconIdentifier(Builder $query, string $beaconIdentifier): Builder
+    {
+        return $query->where('beacon_identifier', $beaconIdentifier);
+    }
+
     public function scopeForProvider(Builder $query, string $provider): Builder
     {
         return $query->whereHas('sentEmail', function (Builder $q) use ($provider) {
