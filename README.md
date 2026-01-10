@@ -6,6 +6,37 @@
 
 A **multi-provider email tracking package** for Laravel 11+ that provides unified tracking for opens, clicks, bounces, complaints, and deliveries across **AWS SES, Resend, Postal, Mailgun, SendGrid, and Postmark**.
 
+## Table of Contents
+
+- [What This Package Does](#what-this-package-does)
+- [What This Package Does NOT Do](#what-this-package-does-not-do)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Basic Usage](#basic-usage)
+- [Webhook Setup](#webhook-setup)
+  - [AWS SES Setup](#aws-ses-setup)
+  - [Resend Setup](#resend-setup)
+  - [Mailgun Setup](#mailgun-setup)
+  - [SendGrid Setup](#sendgrid-setup)
+  - [Postmark Setup](#postmark-setup)
+  - [Postal Setup](#postal-setup)
+- [Security Considerations](#security-considerations)
+- [Events](#events)
+- [Pre-Send Validation](#pre-send-validation)
+- [Database Schema](#database-schema)
+- [Querying Data](#querying-data)
+- [Migrating from juhasev/laravel-ses](#migrating-from-juhasevlaravel-ses)
+- [Admin Panel Plugins](#admin-panel-plugins)
+- [Extending](#extending)
+  - [Custom Providers](#custom-providers)
+  - [Custom Models](#custom-models)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Credits](#credits)
+
 ## What This Package Does
 
 - **Tracks Sent Emails** - Stores records of all emails sent through the package with their message IDs
