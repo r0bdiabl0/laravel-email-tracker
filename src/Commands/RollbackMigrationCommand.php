@@ -33,6 +33,7 @@ class RollbackMigrationCommand extends Command
         foreach (array_keys($this->tableMapping) as $oldTable) {
             if (Schema::hasTable("{$oldTable}_backup")) {
                 $hasBackups = true;
+
                 break;
             }
         }

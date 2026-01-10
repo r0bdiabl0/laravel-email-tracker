@@ -21,6 +21,7 @@ class MigrateFromSesCommand extends Command
 
     protected $description = 'Migrate from juhasev/laravel-ses to r0bdiabl0/laravel-email-tracker';
 
+    // Ordered for foreign key constraints - batches first, then sent_emails, then the rest
     protected array $tableMapping = [
         'laravel_ses_batches' => 'batches',
         'laravel_ses_sent_emails' => 'sent_emails',
@@ -28,6 +29,15 @@ class MigrateFromSesCommand extends Command
         'laravel_ses_email_complaints' => 'email_complaints',
         'laravel_ses_email_opens' => 'email_opens',
         'laravel_ses_email_links' => 'email_links',
+    ];
+
+    // Tables that should have the 'provider' column added during migration
+    protected array $tablesWithProvider = [
+        'sent_emails',
+        'email_bounces',
+        'email_complaints',
+        'email_opens',
+        'email_links',
     ];
 
     public function handle(): int
@@ -97,6 +107,7 @@ class MigrateFromSesCommand extends Command
         foreach (array_keys($this->tableMapping) as $oldTable) {
             if (Schema::hasTable($oldTable)) {
                 $hasOldTables = true;
+
                 break;
             }
         }
@@ -147,8 +158,9 @@ class MigrateFromSesCommand extends Command
 
         $prefix = config('email-tracker.table_prefix', '');
 
-        // First, ensure all new tables exist (run migrations if needed)
-        $this->line('  <fg=cyan>Step 1: Ensuring new tables exist...</>');
+        // Step 1: Check which tables to skip (user declined merge)
+        $this->line('  <fg=cyan>Step 1: Checking target tables...</>');
+        $tablesToSkip = [];
 
         foreach ($this->tableMapping as $old => $new) {
             $newName = $prefix ? "{$prefix}_{$new}" : $new;
@@ -157,38 +169,38 @@ class MigrateFromSesCommand extends Command
                 continue;
             }
 
-            if (Schema::hasTable($newName)) {
-                $existingCount = DB::table($newName)->count();
-                if ($existingCount > 0) {
-                    $this->warn("    Table {$newName} already has {$existingCount} rows.");
+            if (! Schema::hasTable($newName)) {
+                $this->error("    New table {$newName} does not exist. Run migrations first:");
+                $this->line('    php artisan migrate');
 
-                    if (! $this->option('force') && ! $this->option('dry-run')) {
-                        if (! $this->confirm("    Merge data into existing {$newName} table?")) {
-                            $this->line("    Skipping {$old}...");
+                return false;
+            }
 
-                            continue;
-                        }
+            $existingCount = DB::table($newName)->count();
+            if ($existingCount > 0) {
+                $this->warn("    Table {$newName} already has {$existingCount} rows.");
+
+                if (! $this->option('force') && ! $this->option('dry-run')) {
+                    if (! $this->confirm("    Merge data into existing {$newName} table?")) {
+                        $tablesToSkip[] = $old;
+                        $this->line("    Will skip {$old}.");
                     }
                 }
             }
         }
 
-        // Copy data from old tables to new tables
+        // Step 2: Copy data from old tables to new tables
         $this->newLine();
         $this->line('  <fg=cyan>Step 2: Copying data to new tables...</>');
 
-        // Order matters for foreign keys - batches first, then sent_emails, then the rest
-        $orderedMapping = [
-            'laravel_ses_batches' => 'batches',
-            'laravel_ses_sent_emails' => 'sent_emails',
-            'laravel_ses_email_bounces' => 'email_bounces',
-            'laravel_ses_email_complaints' => 'email_complaints',
-            'laravel_ses_email_opens' => 'email_opens',
-            'laravel_ses_email_links' => 'email_links',
-        ];
-
-        foreach ($orderedMapping as $old => $new) {
+        foreach ($this->tableMapping as $old => $new) {
             $newName = $prefix ? "{$prefix}_{$new}" : $new;
+
+            if (in_array($old, $tablesToSkip, true)) {
+                $this->line("    <fg=gray>Skipping {$old} (user declined)</>");
+
+                continue;
+            }
 
             if (! Schema::hasTable($old)) {
                 $this->line("    <fg=gray>Skipping {$old} (not found)</>");
@@ -204,7 +216,7 @@ class MigrateFromSesCommand extends Command
             }
 
             try {
-                $this->copyTableData($old, $newName);
+                $this->copyTableData($old, $newName, $new);
             } catch (\Exception $e) {
                 $this->error("    Failed to copy {$old}: {$e->getMessage()}");
 
@@ -212,7 +224,7 @@ class MigrateFromSesCommand extends Command
             }
         }
 
-        // Optionally delete old tables
+        // Step 3: Optionally delete old tables
         if ($this->option('delete-old') && ! $this->option('dry-run')) {
             $this->newLine();
             $this->line('  <fg=cyan>Step 3: Deleting old tables...</>');
@@ -228,7 +240,7 @@ class MigrateFromSesCommand extends Command
         return true;
     }
 
-    protected function copyTableData(string $oldTable, string $newTable): void
+    protected function copyTableData(string $oldTable, string $newTable, string $baseTableName): void
     {
         $rowCount = DB::table($oldTable)->count();
 
@@ -240,23 +252,22 @@ class MigrateFromSesCommand extends Command
 
         // Get columns from old table
         $oldColumns = Schema::getColumnListing($oldTable);
-
-        // Check if new table exists, if not we need to create it first
-        if (! Schema::hasTable($newTable)) {
-            $this->error("    New table {$newTable} does not exist. Run migrations first.");
-            throw new \RuntimeException("Table {$newTable} does not exist");
-        }
-
         $newColumns = Schema::getColumnListing($newTable);
 
-        // Find common columns (excluding 'provider' which we'll add)
+        // Find common columns (provider will be added separately if needed)
         $commonColumns = array_intersect($oldColumns, $newColumns);
+
+        // Check if this table should have the provider column
+        $shouldAddProvider = in_array($baseTableName, $this->tablesWithProvider, true)
+            && in_array('provider', $newColumns, true)
+            && ! in_array('provider', $oldColumns, true);
 
         // Copy data in chunks to handle large tables
         $chunkSize = 1000;
         $copied = 0;
+        $skipped = 0;
 
-        DB::table($oldTable)->orderBy('id')->chunk($chunkSize, function ($rows) use ($newTable, $commonColumns, &$copied) {
+        DB::table($oldTable)->orderBy('id')->chunk($chunkSize, function ($rows) use ($newTable, $commonColumns, $shouldAddProvider, &$copied, &$skipped) {
             $insertData = [];
 
             foreach ($rows as $row) {
@@ -265,18 +276,25 @@ class MigrateFromSesCommand extends Command
                     $rowData[$column] = $row->{$column};
                 }
 
-                // Add provider column with default 'ses'
-                $rowData['provider'] = 'ses';
+                // Add provider column with default 'ses' only for tables that need it
+                if ($shouldAddProvider) {
+                    $rowData['provider'] = 'ses';
+                }
 
                 $insertData[] = $rowData;
             }
 
             // Use insertOrIgnore to skip duplicates (if re-running migration)
-            DB::table($newTable)->insertOrIgnore($insertData);
-            $copied += count($insertData);
+            $inserted = DB::table($newTable)->insertOrIgnore($insertData);
+            $copied += $inserted;
+            $skipped += count($insertData) - $inserted;
         });
 
-        $this->line("    <fg=green>Copied {$copied} rows: {$oldTable} -> {$newTable}</>");
+        if ($skipped > 0) {
+            $this->line("    <fg=green>Copied {$copied} rows, skipped {$skipped} duplicates: {$oldTable} -> {$newTable}</>");
+        } else {
+            $this->line("    <fg=green>Copied {$copied} rows: {$oldTable} -> {$newTable}</>");
+        }
     }
 
     protected function migrateConfig(): void

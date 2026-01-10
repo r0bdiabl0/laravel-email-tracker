@@ -127,6 +127,7 @@ class EmailValidator
      *
      * @param  array  $emails  List of email addresses
      * @param  string|null  $provider  Optional provider filter
+     *
      * @return array Filtered list with blocked addresses removed
      */
     public static function filterBlockedEmails(array $emails, ?string $provider = null): array

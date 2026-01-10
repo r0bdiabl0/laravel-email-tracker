@@ -15,7 +15,7 @@ class SesProviderTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->provider = new SesProvider();
+        $this->provider = new SesProvider;
     }
 
     public function test_it_returns_correct_name(): void

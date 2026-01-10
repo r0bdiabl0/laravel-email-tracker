@@ -27,7 +27,7 @@ class ModelTest extends TestCase
 
     public function test_sent_email_uses_configurable_table(): void
     {
-        $model = new SentEmail();
+        $model = new SentEmail;
         $this->assertSame('sent_emails', $model->getTable());
     }
 
@@ -35,7 +35,7 @@ class ModelTest extends TestCase
     {
         config(['email-tracker.table_prefix' => 'tracker']);
 
-        $model = new SentEmail();
+        $model = new SentEmail;
         $this->assertSame('tracker_sent_emails', $model->getTable());
 
         // Reset
@@ -44,13 +44,13 @@ class ModelTest extends TestCase
 
     public function test_email_bounce_uses_configurable_table(): void
     {
-        $model = new EmailBounce();
+        $model = new EmailBounce;
         $this->assertSame('email_bounces', $model->getTable());
     }
 
     public function test_batch_uses_configurable_table(): void
     {
-        $model = new Batch();
+        $model = new Batch;
         $this->assertSame('batches', $model->getTable());
     }
 }

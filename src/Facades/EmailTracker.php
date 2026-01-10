@@ -60,7 +60,7 @@ class EmailTracker extends Facade
     public static function registerProvider(string $name, string $handlerClass): void
     {
         app()->singleton("email-tracker.provider.{$name}", function () use ($handlerClass) {
-            return new $handlerClass();
+            return new $handlerClass;
         });
     }
 

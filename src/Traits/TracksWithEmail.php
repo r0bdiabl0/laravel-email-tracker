@@ -28,12 +28,13 @@ trait TracksWithEmail
      * @param  string|array  $to  Email address(es) to send to
      * @param  string|null  $batch  Optional batch name for grouping
      * @param  string|null  $provider  Optional provider override
+     *
      * @return bool True if sent successfully
      */
     public static function sendTracked(
         string|array $to,
         ?string $batch = null,
-        ?string $provider = null
+        ?string $provider = null,
     ): bool {
         $emails = is_array($to) ? $to : [$to];
         $emails = static::filterRecipients($emails);
@@ -82,7 +83,7 @@ trait TracksWithEmail
         string|array $to,
         ?string $batch = null,
         string $queue = 'default',
-        ?string $provider = null
+        ?string $provider = null,
     ): void {
         $emails = is_array($to) ? $to : [$to];
         $emails = static::filterRecipients($emails);
@@ -104,7 +105,7 @@ trait TracksWithEmail
                 }
 
                 $mailer->to($email)->queue(
-                    (new static(...static::getConstructorArgs()))->onQueue($queue)
+                    (new static(...static::getConstructorArgs()))->onQueue($queue),
                 );
             } catch (\Exception $e) {
                 report($e);
@@ -132,6 +133,7 @@ trait TracksWithEmail
      * Override this method to add custom filtering logic.
      *
      * @param  array  $emails  List of email addresses
+     *
      * @return array Filtered list
      */
     protected static function filterRecipients(array $emails): array

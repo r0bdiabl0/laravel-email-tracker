@@ -92,7 +92,7 @@ class EmailTrackerServiceProvider extends ServiceProvider
         foreach (config('email-tracker.providers', []) as $name => $settings) {
             if (($settings['enabled'] ?? false) && isset($settings['handler'])) {
                 $this->app->singleton("email-tracker.provider.{$name}", function () use ($settings) {
-                    return new $settings['handler']();
+                    return new $settings['handler'];
                 });
             }
         }

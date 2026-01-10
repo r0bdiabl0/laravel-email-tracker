@@ -303,7 +303,7 @@ class ResendProvider extends AbstractProvider
             }
 
             $computedSignature = base64_encode(
-                hash_hmac('sha256', $signedContent, $secretBytes, true)
+                hash_hmac('sha256', $signedContent, $secretBytes, true),
             );
 
             if (hash_equals($sig, $computedSignature)) {

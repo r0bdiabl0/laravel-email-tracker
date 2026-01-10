@@ -58,13 +58,13 @@ class InstallCommand extends Command
         $baseUrl = config('app.url', 'https://your-app.com');
         $prefix = config('email-tracker.routes.prefix', 'email-tracker');
 
-        $this->line("     <fg=green>SES (AWS SNS):</>");
+        $this->line('     <fg=green>SES (AWS SNS):</>');
         $this->line("       Bounce:    {$baseUrl}/{$prefix}/webhook/ses/bounce");
         $this->line("       Complaint: {$baseUrl}/{$prefix}/webhook/ses/complaint");
         $this->line("       Delivery:  {$baseUrl}/{$prefix}/webhook/ses/delivery");
         $this->newLine();
 
-        $this->line("     <fg=green>Other Providers:</>");
+        $this->line('     <fg=green>Other Providers:</>');
         $this->line("       Resend:    {$baseUrl}/{$prefix}/webhook/resend");
         $this->line("       Postal:    {$baseUrl}/{$prefix}/webhook/postal");
         $this->line("       Mailgun:   {$baseUrl}/{$prefix}/webhook/mailgun");

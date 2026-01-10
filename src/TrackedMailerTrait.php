@@ -52,7 +52,7 @@ trait TrackedMailerTrait
     protected function checkNumberOfRecipients(Email $message): void
     {
         if (count($message->getTo()) > 1) {
-            throw new TooManyRecipientsException();
+            throw new TooManyRecipientsException;
         }
     }
 

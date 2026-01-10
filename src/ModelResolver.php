@@ -14,6 +14,7 @@ class ModelResolver
      * @template T of Model
      *
      * @param  string  $model  The model type key (e.g., 'sent_email', 'batch')
+     *
      * @return class-string<T>
      */
     public static function get(string $model): string
@@ -31,6 +32,7 @@ class ModelResolver
      *
      * @param  string  $model  The model type key
      * @param  array  $attributes  Model attributes
+     *
      * @return T
      */
     public static function make(string $model, array $attributes = []): Model
@@ -44,6 +46,7 @@ class ModelResolver
      * Get a query builder for the given model type.
      *
      * @param  string  $model  The model type key
+     *
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public static function query(string $model)

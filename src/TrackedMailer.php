@@ -131,8 +131,6 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
     /**
      * Send a Symfony message with tracking.
-     *
-     * @return SentMessage|null
      */
     protected function sendSymfonyMessage(Email $message): ?SentMessage
     {

@@ -159,7 +159,7 @@ class SesProvider extends AbstractProvider
      */
     protected function validateSignatureFromMessage(Message $message): void
     {
-        $validator = new MessageValidator();
+        $validator = new MessageValidator;
         $validator->validate($message);
     }
 

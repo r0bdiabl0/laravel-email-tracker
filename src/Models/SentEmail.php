@@ -90,6 +90,7 @@ class SentEmail extends Model implements SentEmailContract
 
     /**
      * @param  Builder<SentEmail>  $query
+     *
      * @return Builder<SentEmail>
      */
     public function scopeDelivered(Builder $query): Builder
@@ -100,6 +101,7 @@ class SentEmail extends Model implements SentEmailContract
 
     /**
      * @param  Builder<SentEmail>  $query
+     *
      * @return Builder<SentEmail>
      */
     public function scopeNotDelivered(Builder $query): Builder

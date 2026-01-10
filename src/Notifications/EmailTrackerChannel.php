@@ -71,6 +71,7 @@ class EmailTrackerChannel
             $this->afterSend($notifiable, $notification, $result);
         } catch (\Exception $e) {
             $this->onSendFailure($notifiable, $notification, $e);
+
             throw $e;
         }
     }
@@ -79,7 +80,6 @@ class EmailTrackerChannel
      * Build the mail message from the notification.
      *
      * @param  mixed  $notifiable
-     * @return Mailable|null
      */
     protected function buildMessage($notifiable, Notification $notification): ?Mailable
     {

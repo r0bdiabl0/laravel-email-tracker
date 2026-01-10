@@ -96,7 +96,7 @@ class SendgridProvider extends AbstractProvider
 
         return response()->json([
             'success' => true,
-            'message' => "Processed {$processed} events" . ($errors > 0 ? ", {$errors} errors" : ''),
+            'message' => "Processed {$processed} events".($errors > 0 ? ", {$errors} errors" : ''),
         ]);
     }
 
@@ -392,7 +392,7 @@ class SendgridProvider extends AbstractProvider
         }
 
         $payload = $request->getContent();
-        $signedPayload = $timestamp . $payload;
+        $signedPayload = $timestamp.$payload;
 
         // SendGrid uses ECDSA P-256 signatures
         // The verification key is a public key in PEM format
@@ -419,7 +419,7 @@ class SendgridProvider extends AbstractProvider
                 $signedPayload,
                 $decodedSignature,
                 $publicKey,
-                OPENSSL_ALGO_SHA256
+                OPENSSL_ALGO_SHA256,
             );
 
             return $result === 1;
