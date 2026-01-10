@@ -680,11 +680,15 @@ class CustomSmtpProvider extends AbstractProvider
         $payload = $request->all();
         $eventType = $payload['event_type'] ?? 'unknown';
 
+        // Parse into standardized format
+        $data = $this->parsePayload($payload);
+
         // Route to appropriate handler based on event type
+        // The base class handlers expect EmailEventData objects
         return match ($eventType) {
-            'bounce' => $this->handleBounce($payload),
-            'complaint' => $this->handleComplaint($payload),
-            'delivered' => $this->handleDelivery($payload),
+            'bounce' => $this->handleBounce($data),
+            'complaint' => $this->handleComplaint($data),
+            'delivered' => $this->handleDelivery($data),
             default => response()->json(['success' => true]),
         };
     }
@@ -795,15 +799,45 @@ The `AbstractProvider` base class provides useful helper methods:
 // Logging (respects EMAIL_TRACKER_DEBUG setting)
 $this->logDebug('Processing event');
 $this->logError('Failed to process');
+$this->logInfo('Event received');
 $this->logRawPayload($request); // Log full webhook payload
 
 // Configuration access
 $secret = $this->getConfig('webhook_secret');
 
-// Standard event handlers (use these or implement your own)
-$this->handleBounce($payload);     // Creates EmailBounce record
-$this->handleComplaint($payload);  // Creates EmailComplaint record
-$this->handleDelivery($payload);   // Updates SentEmail.delivered_at
+// Standard event handlers - pass an EmailEventData object
+// These create database records and fire events automatically
+$data = $this->parsePayload($payload);  // You implement this
+$this->handleBounce($data);             // Creates EmailBounce record
+$this->handleComplaint($data);          // Creates EmailComplaint record
+$this->handleDelivery($data);           // Updates SentEmail.delivered_at
+```
+
+**Example using the helper methods in your handleWebhook():**
+
+```php
+public function handleWebhook(Request $request, ?string $event = null): Response
+{
+    $this->logRawPayload($request);
+
+    if (! $this->validateSignature($request)) {
+        return response()->json(['error' => 'Invalid signature'], 403);
+    }
+
+    $payload = $request->all();
+    $eventType = $payload['event_type'] ?? 'unknown';
+
+    // Parse into standardized format
+    $data = $this->parsePayload($payload);
+
+    // Use base class handlers
+    return match ($eventType) {
+        'bounce' => $this->handleBounce($data),
+        'complaint' => $this->handleComplaint($data),
+        'delivered' => $this->handleDelivery($data),
+        default => response()->json(['success' => true]),
+    };
+}
 ```
 
 ### Custom Models

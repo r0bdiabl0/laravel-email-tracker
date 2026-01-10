@@ -57,12 +57,24 @@ class EmailTracker extends Facade
 
     /**
      * Register a custom provider handler.
+     *
+     * This registers the handler class AND enables the provider in config
+     * so that webhooks will be routed correctly.
      */
-    public static function registerProvider(string $name, string $handlerClass): void
+    public static function registerProvider(string $name, string $handlerClass, array $config = []): void
     {
+        // Register the handler singleton
         app()->singleton("email-tracker.provider.{$name}", function () use ($handlerClass) {
             return new $handlerClass;
         });
+
+        // Also set the provider as enabled in config so webhooks work
+        $providerConfig = array_merge([
+            'enabled' => true,
+            'handler' => $handlerClass,
+        ], $config);
+
+        config(["email-tracker.providers.{$name}" => $providerConfig]);
     }
 
     /**

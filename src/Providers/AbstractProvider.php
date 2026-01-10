@@ -4,9 +4,18 @@ declare(strict_types=1);
 
 namespace R0bdiabl0\EmailTracker\Providers;
 
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use R0bdiabl0\EmailTracker\Contracts\EmailProviderInterface;
+use R0bdiabl0\EmailTracker\DataTransferObjects\EmailEventData;
+use R0bdiabl0\EmailTracker\Events\EmailBounceEvent;
+use R0bdiabl0\EmailTracker\Events\EmailComplaintEvent;
+use R0bdiabl0\EmailTracker\Events\EmailDeliveryEvent;
+use R0bdiabl0\EmailTracker\ModelResolver;
 
 abstract class AbstractProvider implements EmailProviderInterface
 {
@@ -73,6 +82,138 @@ abstract class AbstractProvider implements EmailProviderInterface
     {
         if (config('email-tracker.debug', false)) {
             $this->logDebug('Raw payload: '.$request->getContent());
+        }
+    }
+
+    /**
+     * Handle a bounce event - creates an EmailBounce record.
+     *
+     * Override this method in your provider to customize bounce handling,
+     * or call it from your handleWebhook() method with parsed data.
+     *
+     * @param  EmailEventData  $data  Parsed event data
+     */
+    protected function handleBounce(EmailEventData $data): JsonResponse
+    {
+        if (! $data->messageId) {
+            $this->logError('Bounce notification missing message ID');
+
+            return response()->json(['success' => false, 'error' => 'Missing message ID'], 400);
+        }
+
+        try {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $data->messageId)
+                ->where('bounce_tracking', true)
+                ->firstOrFail();
+
+            $emailBounce = ModelResolver::get('email_bounce')::create([
+                'provider' => $this->getName(),
+                'sent_email_id' => $sentEmail->id,
+                'type' => $data->bounceType ?? 'Permanent',
+                'email' => $data->email,
+                'bounced_at' => $data->timestamp ?? now(),
+            ]);
+
+            event(new EmailBounceEvent($emailBounce));
+
+            $this->logDebug("Bounce processed for: {$data->email}");
+
+            return response()->json(['success' => true, 'message' => 'Bounce processed']);
+        } catch (ModelNotFoundException) {
+            $this->logDebug("Message ID ({$data->messageId}) not found or bounce tracking disabled. Skipping...");
+
+            return response()->json(['success' => true, 'message' => 'Message not tracked']);
+        } catch (Exception $e) {
+            $this->logError("Failed to process bounce: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'error' => 'Processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle a complaint event - creates an EmailComplaint record.
+     *
+     * Override this method in your provider to customize complaint handling,
+     * or call it from your handleWebhook() method with parsed data.
+     *
+     * @param  EmailEventData  $data  Parsed event data
+     */
+    protected function handleComplaint(EmailEventData $data): JsonResponse
+    {
+        if (! $data->messageId) {
+            $this->logError('Complaint notification missing message ID');
+
+            return response()->json(['success' => false, 'error' => 'Missing message ID'], 400);
+        }
+
+        try {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $data->messageId)
+                ->where('complaint_tracking', true)
+                ->firstOrFail();
+
+            $emailComplaint = ModelResolver::get('email_complaint')::create([
+                'provider' => $this->getName(),
+                'sent_email_id' => $sentEmail->id,
+                'type' => $data->complaintType ?? 'spam',
+                'email' => $data->email,
+                'complained_at' => $data->timestamp ?? now(),
+            ]);
+
+            event(new EmailComplaintEvent($emailComplaint));
+
+            $this->logDebug("Complaint processed for: {$data->email}");
+
+            return response()->json(['success' => true, 'message' => 'Complaint processed']);
+        } catch (ModelNotFoundException) {
+            $this->logDebug("Message ID ({$data->messageId}) not found or complaint tracking disabled. Skipping...");
+
+            return response()->json(['success' => true, 'message' => 'Message not tracked']);
+        } catch (Exception $e) {
+            $this->logError("Failed to process complaint: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'error' => 'Processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle a delivery event - updates the SentEmail.delivered_at timestamp.
+     *
+     * Override this method in your provider to customize delivery handling,
+     * or call it from your handleWebhook() method with parsed data.
+     *
+     * @param  EmailEventData  $data  Parsed event data
+     */
+    protected function handleDelivery(EmailEventData $data): JsonResponse
+    {
+        if (! $data->messageId) {
+            $this->logError('Delivery notification missing message ID');
+
+            return response()->json(['success' => false, 'error' => 'Missing message ID'], 400);
+        }
+
+        try {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $data->messageId)
+                ->where('delivery_tracking', true)
+                ->firstOrFail();
+
+            $sentEmail->setDeliveredAt($data->timestamp ?? now());
+
+            event(new EmailDeliveryEvent($sentEmail));
+
+            $this->logDebug("Delivery processed for message: {$data->messageId}");
+
+            return response()->json(['success' => true, 'message' => 'Delivery processed']);
+        } catch (ModelNotFoundException) {
+            $this->logDebug("Message ID ({$data->messageId}) not found or delivery tracking disabled. Skipping...");
+
+            return response()->json(['success' => true, 'message' => 'Message not tracked']);
+        } catch (Exception $e) {
+            $this->logError("Failed to process delivery: {$e->getMessage()}");
+
+            return response()->json(['success' => false, 'error' => 'Processing failed'], 500);
         }
     }
 }
