@@ -26,7 +26,7 @@ A **multi-provider email tracking package** for Laravel 11+ that provides unifie
 - **Does NOT guarantee open tracking accuracy** - Many email clients block tracking pixels. Open tracking should be considered a lower-bound estimate
 - **Does NOT track replies** - This package tracks delivery events, not incoming mail
 - **Does NOT provide analytics dashboards** - It stores data in your database; you build your own reports or use tools like Filament
-- **Does NOT handle transactional email templates** - Use Laravel's Mailable system for that
+- **Does NOT provide a template builder** - You design emails using Laravel's Mailable and Blade views (which are fully supported and tracked)
 - **Does NOT replace your email provider's dashboard** - It supplements it with data in your own database
 
 ## Requirements
@@ -514,42 +514,211 @@ Enable legacy routes to keep old webhook URLs working:
 EMAIL_TRACKER_LEGACY_ROUTES=true
 ```
 
+## Admin Panel Plugins
+
+### Filament Plugin
+
+For **Filament v3/v4** users, install the companion plugin for dashboard widgets, statistics, and resource pages:
+
+```bash
+composer require r0bdiabl0/laravel-email-tracker-filament
+```
+
+Features:
+- **Dashboard Widgets** - Stats overview, delivery charts, health scores, recent activity
+- **Resource Pages** - Browse, search, and filter sent emails, bounces, and complaints
+- **Statistics Service** - Query aggregated stats for custom integrations
+
+Register in your Filament panel provider:
+
+```php
+use R0bdiabl0\EmailTrackerFilament\EmailTrackerFilamentPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->plugins([
+            EmailTrackerFilamentPlugin::make(),
+        ]);
+}
+```
+
+See [r0bdiabl0/laravel-email-tracker-filament](https://github.com/r0bdiabl0/laravel-email-tracker-filament) for full documentation.
+
+### Nova Plugin
+
+For **Laravel Nova v4/v5** users, install the companion plugin for resource management:
+
+```bash
+composer require r0bdiabl0/laravel-email-tracker-nova
+```
+
+Features:
+- **Sent Emails Resource** - Browse, search, filter by provider and status
+- **Bounces Resource** - View bounce records with type badges
+- **Complaints Resource** - Track spam complaints
+- **Read-Only** - Safe viewing without accidental modifications
+
+The resources are auto-registered. See [r0bdiabl0/laravel-email-tracker-nova](https://github.com/r0bdiabl0/laravel-email-tracker-nova) for customization options.
+
 ## Extending
 
 ### Custom Providers
 
-Implement `EmailProviderInterface` and register:
+This package is fully extensible. You can add support for any email provider by implementing your own webhook handler.
+
+**Step 1: Create your provider class**
+
+Extend `AbstractProvider` which implements `EmailProviderInterface`:
 
 ```php
-use R0bdiabl0\EmailTracker\Providers\AbstractProvider;
+namespace App\EmailProviders;
+
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use R0bdiabl0\EmailTracker\DataTransferObjects\EmailEventData;
+use R0bdiabl0\EmailTracker\Enums\EmailEventType;
+use R0bdiabl0\EmailTracker\Providers\AbstractProvider;
 use Symfony\Component\HttpFoundation\Response;
 
 class CustomSmtpProvider extends AbstractProvider
 {
+    /**
+     * Unique provider name (used in routes and database).
+     */
     public function getName(): string
     {
         return 'custom-smtp';
     }
 
+    /**
+     * Handle incoming webhook from your email provider.
+     */
     public function handleWebhook(Request $request, ?string $event = null): Response
     {
-        // Parse and process webhook payload
+        $this->logRawPayload($request);
+
+        // Validate webhook signature
+        if (! $this->validateSignature($request)) {
+            return response()->json(['error' => 'Invalid signature'], 403);
+        }
+
+        $payload = $request->all();
+        $eventType = $payload['event_type'] ?? 'unknown';
+
+        // Route to appropriate handler based on event type
+        return match ($eventType) {
+            'bounce' => $this->handleBounce($payload),
+            'complaint' => $this->handleComplaint($payload),
+            'delivered' => $this->handleDelivery($payload),
+            default => response()->json(['success' => true]),
+        };
     }
 
+    /**
+     * Parse webhook payload into standardized EmailEventData.
+     */
     public function parsePayload(array $payload): EmailEventData
     {
-        // Convert to standardized format
+        return new EmailEventData(
+            messageId: $payload['message_id'] ?? '',
+            email: $payload['recipient'] ?? '',
+            provider: $this->getName(),
+            eventType: $this->mapEventType($payload['event_type'] ?? ''),
+            timestamp: isset($payload['timestamp'])
+                ? Carbon::parse($payload['timestamp'])
+                : null,
+            bounceType: $payload['bounce_type'] ?? null,
+            metadata: $payload,
+        );
     }
 
+    /**
+     * Validate webhook signature/authenticity.
+     */
     public function validateSignature(Request $request): bool
     {
-        // Verify webhook authenticity
+        $secret = $this->getConfig('webhook_secret');
+
+        if (! $secret) {
+            return true; // Skip validation if no secret configured
+        }
+
+        $signature = $request->header('X-Custom-Signature');
+        $expectedSignature = hash_hmac('sha256', $request->getContent(), $secret);
+
+        return hash_equals($expectedSignature, $signature ?? '');
+    }
+
+    /**
+     * Map provider event types to EmailEventType enum.
+     */
+    protected function mapEventType(string $event): EmailEventType
+    {
+        return match ($event) {
+            'bounce' => EmailEventType::Bounced,
+            'complaint' => EmailEventType::Complained,
+            'delivered' => EmailEventType::Delivered,
+            'opened' => EmailEventType::Opened,
+            'clicked' => EmailEventType::Clicked,
+            default => EmailEventType::Sent,
+        };
     }
 }
+```
 
-// Register in a service provider
-EmailTracker::registerProvider('custom-smtp', CustomSmtpProvider::class);
+**Step 2: Register your provider**
+
+In your `AppServiceProvider` or a dedicated service provider:
+
+```php
+use R0bdiabl0\EmailTracker\Facades\EmailTracker;
+use App\EmailProviders\CustomSmtpProvider;
+
+public function boot(): void
+{
+    EmailTracker::registerProvider('custom-smtp', CustomSmtpProvider::class);
+}
+```
+
+**Step 3: Add configuration** (optional)
+
+```php
+// config/email-tracker.php
+'providers' => [
+    // ... built-in providers ...
+
+    'custom-smtp' => [
+        'enabled' => env('EMAIL_TRACKER_CUSTOM_SMTP_ENABLED', true),
+        'webhook_secret' => env('EMAIL_TRACKER_CUSTOM_SMTP_SECRET'),
+    ],
+],
+```
+
+**Step 4: Set up webhook URL**
+
+Your custom provider's webhook URL will be:
+```
+https://your-app.com/email-tracker/webhook/custom-smtp
+```
+
+### AbstractProvider Helper Methods
+
+The `AbstractProvider` base class provides useful helper methods:
+
+```php
+// Logging (respects EMAIL_TRACKER_DEBUG setting)
+$this->logDebug('Processing event');
+$this->logError('Failed to process');
+$this->logRawPayload($request); // Log full webhook payload
+
+// Configuration access
+$secret = $this->getConfig('webhook_secret');
+
+// Standard event handlers (use these or implement your own)
+$this->handleBounce($payload);     // Creates EmailBounce record
+$this->handleComplaint($payload);  // Creates EmailComplaint record
+$this->handleDelivery($payload);   // Updates SentEmail.delivered_at
 ```
 
 ### Custom Models
@@ -637,4 +806,5 @@ The MIT License (MIT). Please see [License File](LICENSE) for more information.
 
 ## Credits
 
-This package is based on the excellent work from [juhasev/laravel-ses](https://github.com/juhasev/laravel-ses).
+- [Robert Pettique](https://github.com/r0bdiabl0) - Author and maintainer
+- Based on the excellent work from [juhasev/laravel-ses](https://github.com/juhasev/laravel-ses)
