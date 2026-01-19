@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] - 2026-01-19
+## [2.0.0] - 2026-01-19
+
+### Added
+- Suppression now works automatically across all sending methods (Facade, TracksWithEmail trait, EmailTrackerChannel)
+- `AddressSuppressedException` thrown when sending to suppressed addresses
+- Better suppression reason reporting (permanent bounce, spam complaint)
+
+### Changed
+- **BREAKING:** Renamed config key `validation` to `suppression` for clarity
+- Updated terminology from "validation" to "suppression" throughout codebase and documentation
 
 ### Removed
 - Unused `EMAIL_TRACKER_NOTIFICATION_CHANNEL` config option (notification channel works without it)

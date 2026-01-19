@@ -4,7 +4,7 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/r0bdiabl0/laravel-email-tracker.svg?style=flat-square)](https://packagist.org/packages/r0bdiabl0/laravel-email-tracker)
 [![License](https://img.shields.io/packagist/l/r0bdiabl0/laravel-email-tracker.svg?style=flat-square)](https://packagist.org/packages/r0bdiabl0/laravel-email-tracker)
 
-A **multi-provider email tracking package** for Laravel 11+ that provides unified tracking for opens, clicks, bounces, complaints, and deliveries across **AWS SES, Resend, Postal, Mailgun, SendGrid, and Postmark**.
+A **multi-provider email tracking and bounce management package** for Laravel 11+ that provides unified tracking for opens, clicks, bounces, complaints, and deliveries across **AWS SES, Resend, Postal, Mailgun, SendGrid, and Postmark**. Includes optional suppression to automatically skip sending to problematic addresses.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ A **multi-provider email tracking package** for Laravel 11+ that provides unifie
 - [Security Considerations](#security-considerations)
 - [One-Click Unsubscribe (RFC 8058)](#one-click-unsubscribe-rfc-8058)
 - [Events](#events)
-- [Pre-Send Validation](#pre-send-validation)
+- [Suppression (Bounce Management)](#suppression-bounce-management)
 - [Database Schema](#database-schema)
 - [Querying Data](#querying-data)
 - [Migrating from juhasev/laravel-ses](#migrating-from-juhasevlaravel-ses)
@@ -48,7 +48,7 @@ A **multi-provider email tracking package** for Laravel 11+ that provides unifie
 - **Delivery Confirmation** - Records successful deliveries reported by email providers
 - **Batch Grouping** - Organize emails into named batches for campaigns or bulk sends
 - **Multi-Provider Support** - Unified interface across 6 major email providers
-- **Pre-Send Validation** - Optionally block sending to previously bounced/complained addresses
+- **Suppression** - Optionally skip sending to previously bounced or complained addresses (bounce management)
 - **One-Click Unsubscribe** - RFC 8058 compliant List-Unsubscribe headers for improved deliverability
 - **Event Dispatching** - Laravel events for all tracking activities for your own listeners
 
@@ -137,12 +137,12 @@ POSTAL_WEBHOOK_KEY=your-secret-key            # Postal: X-Postal-Webhook-Key hea
 POSTMARK_WEBHOOK_TOKEN=your-token             # Postmark: X-Postmark-Webhook-Token header
 
 # =============================================================================
-# VALIDATION OPTIONS (disabled by default)
+# SUPPRESSION / BOUNCE MANAGEMENT (disabled by default)
 # =============================================================================
 
 # Automatically skip sending to problematic addresses (recommended for production)
-EMAIL_TRACKER_SKIP_BOUNCED=false              # Set true to skip previously bounced addresses
-EMAIL_TRACKER_SKIP_COMPLAINED=false           # Set true to skip addresses that complained (spam)
+EMAIL_TRACKER_SKIP_BOUNCED=false              # Set true to suppress bounced addresses
+EMAIL_TRACKER_SKIP_COMPLAINED=false           # Set true to suppress addresses that complained (spam)
 
 # =============================================================================
 # ONE-CLICK UNSUBSCRIBE (RFC 8058)
@@ -625,19 +625,28 @@ class HandleEmailBounce
 }
 ```
 
-## Pre-Send Validation
+## Suppression (Bounce Management)
 
-Automatically skip sending to bounced or complained addresses:
+Automatically skip sending to bounced or complained addresses. This is disabled by default - enable it to protect your sender reputation:
 
 ```php
 // config/email-tracker.php
-'validation' => [
+'suppression' => [
     'skip_bounced' => true,    // Skip permanently bounced addresses
     'skip_complained' => true, // Skip addresses that filed complaints
 ],
 ```
 
-Or validate manually:
+When enabled, suppression works automatically across all sending methods:
+- `EmailTracker::send()` facade
+- `TracksWithEmail` trait on Mailables
+- `EmailTrackerChannel` for Notifications
+
+If a suppressed address is detected, an `AddressSuppressedException` is thrown with the email and reason.
+
+### Manual Suppression Checking
+
+You can also check suppression manually:
 
 ```php
 use R0bdiabl0\EmailTracker\Services\EmailValidator;

@@ -119,9 +119,9 @@ trait TracksWithEmail
      */
     protected static function shouldBlockEmail(string $email): bool
     {
-        // Default implementation uses EmailValidator if skip_bounced/skip_complained is enabled
-        if (config('email-tracker.validation.skip_bounced', false) ||
-            config('email-tracker.validation.skip_complained', false)) {
+        // Default implementation uses EmailValidator if suppression is enabled
+        if (config('email-tracker.suppression.skip_bounced', false) ||
+            config('email-tracker.suppression.skip_complained', false)) {
             return EmailValidator::shouldBlock($email);
         }
 

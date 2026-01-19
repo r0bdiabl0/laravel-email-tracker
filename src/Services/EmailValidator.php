@@ -16,13 +16,13 @@ class EmailValidator
      */
     public static function shouldBlock(string $email, ?string $provider = null): bool
     {
-        if (config('email-tracker.validation.skip_bounced', false)) {
+        if (config('email-tracker.suppression.skip_bounced', false)) {
             if (static::hasPermanentBounce($email, $provider)) {
                 return true;
             }
         }
 
-        if (config('email-tracker.validation.skip_complained', false)) {
+        if (config('email-tracker.suppression.skip_complained', false)) {
             if (static::hasComplaint($email, $provider)) {
                 return true;
             }

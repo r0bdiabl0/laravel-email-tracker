@@ -144,9 +144,9 @@ class EmailTrackerChannel
             return false;
         }
 
-        // Check for bounce/complaint if validation is enabled
-        if (config('email-tracker.validation.skip_bounced', false) ||
-            config('email-tracker.validation.skip_complained', false)) {
+        // Check for bounce/complaint if suppression is enabled
+        if (config('email-tracker.suppression.skip_bounced', false) ||
+            config('email-tracker.suppression.skip_complained', false)) {
             if (EmailValidator::shouldBlock($recipient)) {
                 return false;
             }

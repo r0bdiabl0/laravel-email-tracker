@@ -146,18 +146,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Validation Options
+    | Suppression / Bounce Management
     |--------------------------------------------------------------------------
     |
-    | Configure automatic validation to skip sending to problematic addresses.
+    | Configure automatic suppression to skip sending to problematic addresses.
+    | Disabled by default. Enable in production to protect sender reputation.
     |
     */
 
-    'validation' => [
-        // Automatically skip emails that have bounced
+    'suppression' => [
+        // Automatically skip emails to addresses that have bounced
         'skip_bounced' => env('EMAIL_TRACKER_SKIP_BOUNCED', false),
 
-        // Automatically skip emails that have complained (marked as spam)
+        // Automatically skip emails to addresses that have complained (spam)
         'skip_complained' => env('EMAIL_TRACKER_SKIP_COMPLAINED', false),
     ],
 

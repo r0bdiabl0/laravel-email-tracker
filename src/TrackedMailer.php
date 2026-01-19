@@ -14,11 +14,13 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
 use R0bdiabl0\EmailTracker\Contracts\TrackedMailerInterface;
+use R0bdiabl0\EmailTracker\Exceptions\AddressSuppressedException;
 use R0bdiabl0\EmailTracker\Exceptions\DailyQuotaExceededException;
 use R0bdiabl0\EmailTracker\Exceptions\InvalidSenderAddressException;
 use R0bdiabl0\EmailTracker\Exceptions\MaximumSendingRateExceededException;
 use R0bdiabl0\EmailTracker\Exceptions\SendFailedException;
 use R0bdiabl0\EmailTracker\Exceptions\TemporaryServiceFailureException;
+use R0bdiabl0\EmailTracker\Services\EmailValidator;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Header\Headers;
 use Throwable;
@@ -91,6 +93,7 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
      * @param  MailableContract|string|array  $view
      * @param  Closure|string|null  $callback
      *
+     * @throws AddressSuppressedException
      * @throws DailyQuotaExceededException
      * @throws InvalidSenderAddressException
      * @throws MaximumSendingRateExceededException
@@ -119,6 +122,9 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
         $symfonyMessage = $message->getSymfonyMessage();
 
+        // Check suppression before sending
+        $this->checkSuppression($symfonyMessage);
+
         if ($this->shouldSendMessage($symfonyMessage, $data)) {
             try {
                 return $this->sendSymfonyMessage($symfonyMessage);
@@ -128,6 +134,56 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
         }
 
         return null;
+    }
+
+    /**
+     * Check if any recipients are suppressed and throw exception if so.
+     *
+     * @throws AddressSuppressedException
+     */
+    protected function checkSuppression(Email $message): void
+    {
+        // Only check if suppression is enabled
+        if (! config('email-tracker.suppression.skip_bounced', false) &&
+            ! config('email-tracker.suppression.skip_complained', false)) {
+            return;
+        }
+
+        // Check all recipients (to, cc, bcc)
+        $recipients = array_merge(
+            $message->getTo(),
+            $message->getCc(),
+            $message->getBcc()
+        );
+
+        foreach ($recipients as $address) {
+            $email = $address->getAddress();
+
+            if (EmailValidator::shouldBlock($email, $this->provider)) {
+                $reason = $this->getSuppressionReason($email);
+                throw new AddressSuppressedException($email, $reason);
+            }
+        }
+    }
+
+    /**
+     * Get the reason why an email is suppressed.
+     */
+    protected function getSuppressionReason(string $email): string
+    {
+        $reasons = [];
+
+        if (config('email-tracker.suppression.skip_bounced', false) &&
+            EmailValidator::hasPermanentBounce($email, $this->provider)) {
+            $reasons[] = 'permanent bounce';
+        }
+
+        if (config('email-tracker.suppression.skip_complained', false) &&
+            EmailValidator::hasComplaint($email, $this->provider)) {
+            $reasons[] = 'spam complaint';
+        }
+
+        return implode(' and ', $reasons) ?: 'suppressed';
     }
 
     /**
