@@ -128,9 +128,6 @@ EMAIL_TRACKER_POSTMARK_ENABLED=false
 
 # AWS SES specific settings
 EMAIL_TRACKER_SNS_VALIDATOR=true              # Validate SNS message signatures (recommended)
-EMAIL_TRACKER_SES_PING_THRESHOLD=10           # SMTP ping threshold
-EMAIL_TRACKER_SES_RESTART_THRESHOLD=100       # SMTP restart threshold
-EMAIL_TRACKER_SES_RESTART_SLEEP=0             # Sleep duration on SMTP restart
 
 # Webhook signing secrets (provider-specific)
 RESEND_WEBHOOK_SECRET=whsec_...               # Resend: Svix webhook signature
@@ -138,17 +135,6 @@ MAILGUN_WEBHOOK_SIGNING_KEY=key-...           # Mailgun: HMAC-SHA256 signing key
 SENDGRID_VERIFICATION_KEY="-----BEGIN..."     # SendGrid: ECDSA public key (PEM format)
 POSTAL_WEBHOOK_KEY=your-secret-key            # Postal: X-Postal-Webhook-Key header
 POSTMARK_WEBHOOK_TOKEN=your-token             # Postmark: X-Postmark-Webhook-Token header
-
-# =============================================================================
-# TRACKING OPTIONS
-# =============================================================================
-
-# Enable/disable specific tracking features
-EMAIL_TRACKER_TRACK_OPENS=true
-EMAIL_TRACKER_TRACK_LINKS=true
-EMAIL_TRACKER_TRACK_BOUNCES=true
-EMAIL_TRACKER_TRACK_COMPLAINTS=true
-EMAIL_TRACKER_TRACK_DELIVERIES=true
 
 # =============================================================================
 # VALIDATION OPTIONS
@@ -173,9 +159,6 @@ EMAIL_TRACKER_UNSUBSCRIBE_REDIRECT=           # Redirect URL after unsubscribe (
 
 # Enable legacy routes for backwards compatibility with juhasev/laravel-ses
 EMAIL_TRACKER_LEGACY_ROUTES=false
-
-# Enable the built-in notification channel
-EMAIL_TRACKER_NOTIFICATION_CHANNEL=false
 ```
 
 ### Table Names

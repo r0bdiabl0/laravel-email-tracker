@@ -65,11 +65,6 @@ return [
 
             // AWS SNS signature validation (recommended for production)
             'sns_validator' => env('EMAIL_TRACKER_SNS_VALIDATOR', true),
-
-            // SMTP thresholds for SES
-            'ping_threshold' => env('EMAIL_TRACKER_SES_PING_THRESHOLD', 10),
-            'restart_threshold' => env('EMAIL_TRACKER_SES_RESTART_THRESHOLD', 100),
-            'restart_sleep' => env('EMAIL_TRACKER_SES_RESTART_SLEEP', 0),
         ],
 
         'resend' => [
@@ -112,23 +107,6 @@ return [
             'webhook_token' => env('POSTMARK_WEBHOOK_TOKEN'),
         ],
 
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Tracking Options
-    |--------------------------------------------------------------------------
-    |
-    | Enable or disable specific tracking features globally.
-    |
-    */
-
-    'tracking' => [
-        'opens' => env('EMAIL_TRACKER_TRACK_OPENS', true),
-        'links' => env('EMAIL_TRACKER_TRACK_LINKS', true),
-        'bounces' => env('EMAIL_TRACKER_TRACK_BOUNCES', true),
-        'complaints' => env('EMAIL_TRACKER_TRACK_COMPLAINTS', true),
-        'deliveries' => env('EMAIL_TRACKER_TRACK_DELIVERIES', true),
     ],
 
     /*
@@ -198,9 +176,6 @@ return [
 
         // Route prefix for all email tracker routes
         'prefix' => env('EMAIL_TRACKER_ROUTE_PREFIX', 'email-tracker'),
-
-        // Middleware to apply to webhook routes (usually empty for webhooks)
-        'middleware' => [],
     ],
 
     /*
@@ -216,20 +191,6 @@ return [
 
     'legacy_routes' => [
         'enabled' => env('EMAIL_TRACKER_LEGACY_ROUTES', false),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Notification Channel
-    |--------------------------------------------------------------------------
-    |
-    | Configure the optional notification channel for tracked email sending.
-    |
-    */
-
-    'notifications' => [
-        // Enable the built-in notification channel
-        'channel_enabled' => env('EMAIL_TRACKER_NOTIFICATION_CHANNEL', false),
     ],
 
     /*
