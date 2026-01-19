@@ -92,19 +92,33 @@ This will:
 Add these to your `.env` file:
 
 ```env
+# =============================================================================
+# CORE SETTINGS
+# =============================================================================
+
 # Default provider (ses, resend, postal, mailgun, sendgrid, postmark)
 EMAIL_TRACKER_DEFAULT_PROVIDER=ses
 
 # Optional table prefix (leave empty for no prefix)
 EMAIL_TRACKER_TABLE_PREFIX=
 
-# Optional route prefix (default: email-tracker)
+# Enable/disable route registration
+EMAIL_TRACKER_ROUTES_ENABLED=true
+
+# Route prefix for all email tracker routes (default: email-tracker)
 EMAIL_TRACKER_ROUTE_PREFIX=email-tracker
 
-# Debug logging
+# Debug logging (disable in production)
 EMAIL_TRACKER_DEBUG=false
 
-# Provider-specific settings
+# Log message prefix
+EMAIL_TRACKER_LOG_PREFIX=EMAIL-TRACKER
+
+# =============================================================================
+# PROVIDER SETTINGS
+# =============================================================================
+
+# Enable/disable providers
 EMAIL_TRACKER_SES_ENABLED=true
 EMAIL_TRACKER_RESEND_ENABLED=false
 EMAIL_TRACKER_POSTAL_ENABLED=false
@@ -112,18 +126,56 @@ EMAIL_TRACKER_MAILGUN_ENABLED=false
 EMAIL_TRACKER_SENDGRID_ENABLED=false
 EMAIL_TRACKER_POSTMARK_ENABLED=false
 
+# AWS SES specific settings
+EMAIL_TRACKER_SNS_VALIDATOR=true              # Validate SNS message signatures (recommended)
+EMAIL_TRACKER_SES_PING_THRESHOLD=10           # SMTP ping threshold
+EMAIL_TRACKER_SES_RESTART_THRESHOLD=100       # SMTP restart threshold
+EMAIL_TRACKER_SES_RESTART_SLEEP=0             # Sleep duration on SMTP restart
+
 # Webhook signing secrets (provider-specific)
-# AWS SES: Uses SNS certificate validation (automatic)
-# Resend: Uses Svix webhook signatures
-RESEND_WEBHOOK_SECRET=whsec_...
-# Mailgun: HMAC-SHA256 with your signing key
-MAILGUN_WEBHOOK_SIGNING_KEY=key-...
-# SendGrid: ECDSA verification key (public key in PEM format)
-SENDGRID_VERIFICATION_KEY="-----BEGIN PUBLIC KEY-----..."
-# Postal: Simple shared key in X-Postal-Webhook-Key header
-POSTAL_WEBHOOK_KEY=your-secret-key
-# Postmark: Token in X-Postmark-Webhook-Token header or Basic auth
-POSTMARK_WEBHOOK_TOKEN=your-token
+RESEND_WEBHOOK_SECRET=whsec_...               # Resend: Svix webhook signature
+MAILGUN_WEBHOOK_SIGNING_KEY=key-...           # Mailgun: HMAC-SHA256 signing key
+SENDGRID_VERIFICATION_KEY="-----BEGIN..."     # SendGrid: ECDSA public key (PEM format)
+POSTAL_WEBHOOK_KEY=your-secret-key            # Postal: X-Postal-Webhook-Key header
+POSTMARK_WEBHOOK_TOKEN=your-token             # Postmark: X-Postmark-Webhook-Token header
+
+# =============================================================================
+# TRACKING OPTIONS
+# =============================================================================
+
+# Enable/disable specific tracking features
+EMAIL_TRACKER_TRACK_OPENS=true
+EMAIL_TRACKER_TRACK_LINKS=true
+EMAIL_TRACKER_TRACK_BOUNCES=true
+EMAIL_TRACKER_TRACK_COMPLAINTS=true
+EMAIL_TRACKER_TRACK_DELIVERIES=true
+
+# =============================================================================
+# VALIDATION OPTIONS
+# =============================================================================
+
+# Automatically skip sending to problematic addresses
+EMAIL_TRACKER_SKIP_BOUNCED=false              # Skip previously bounced addresses
+EMAIL_TRACKER_SKIP_COMPLAINED=false           # Skip addresses that complained (spam)
+
+# =============================================================================
+# ONE-CLICK UNSUBSCRIBE (RFC 8058)
+# =============================================================================
+
+EMAIL_TRACKER_UNSUBSCRIBE_ENABLED=false       # Enable List-Unsubscribe headers
+EMAIL_TRACKER_UNSUBSCRIBE_MAILTO=             # Optional mailto: fallback address
+EMAIL_TRACKER_UNSUBSCRIBE_EXPIRATION=0        # Signature expiration in hours (0 = never)
+EMAIL_TRACKER_UNSUBSCRIBE_REDIRECT=           # Redirect URL after unsubscribe (null = JSON)
+
+# =============================================================================
+# OTHER OPTIONS
+# =============================================================================
+
+# Enable legacy routes for backwards compatibility with juhasev/laravel-ses
+EMAIL_TRACKER_LEGACY_ROUTES=false
+
+# Enable the built-in notification channel
+EMAIL_TRACKER_NOTIFICATION_CHANNEL=false
 ```
 
 ### Table Names
