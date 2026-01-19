@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-01-19
+
+### Added
+- RFC 8058 one-click unsubscribe support with `List-Unsubscribe` and `List-Unsubscribe-Post` headers
+- `UnsubscribeController` for handling unsubscribe requests with signed URL validation
+- `EmailUnsubscribeEvent` fired when a user unsubscribes
+- `enableUnsubscribeHeaders()` and `disableUnsubscribeHeaders()` methods on TrackingTrait
+- Configurable unsubscribe options: mailto fallback, signature expiration, redirect URL
+- `provider()` method for explicit provider selection in multi-provider setups
+
+### Fixed
+- Custom provider registration now works correctly
+- Default provider configuration is properly applied
+- Base event handlers added for custom providers
+
+### Changed
+- Improved custom provider webhook setup documentation
+
 ## [1.0.0] - 2024-01-01
 
 ### Added
