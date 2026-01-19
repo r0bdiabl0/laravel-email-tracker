@@ -9,6 +9,15 @@ use R0bdiabl0\EmailTracker\ModelResolver;
 class EmailValidator
 {
     /**
+     * Check if suppression is enabled in config.
+     */
+    public static function isSuppressionEnabled(): bool
+    {
+        return config('email-tracker.suppression.skip_bounced', false)
+            || config('email-tracker.suppression.skip_complained', false);
+    }
+
+    /**
      * Check if an email address should be blocked from sending.
      *
      * @param  string  $email  Email address to check
@@ -29,6 +38,31 @@ class EmailValidator
         }
 
         return false;
+    }
+
+    /**
+     * Get the suppression reason for a blocked email, or null if not blocked.
+     * This is more efficient than calling shouldBlock() then getting the reason separately.
+     *
+     * @param  string  $email  Email address to check
+     * @param  string|null  $provider  Optional provider to check against
+     * @return string|null  The suppression reason, or null if not blocked
+     */
+    public static function getBlockReason(string $email, ?string $provider = null): ?string
+    {
+        $reasons = [];
+
+        if (config('email-tracker.suppression.skip_bounced', false) &&
+            static::hasPermanentBounce($email, $provider)) {
+            $reasons[] = 'permanent bounce';
+        }
+
+        if (config('email-tracker.suppression.skip_complained', false) &&
+            static::hasComplaint($email, $provider)) {
+            $reasons[] = 'spam complaint';
+        }
+
+        return $reasons ? implode(' and ', $reasons) : null;
     }
 
     /**

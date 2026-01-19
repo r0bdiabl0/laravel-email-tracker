@@ -137,15 +137,75 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
     }
 
     /**
+     * Send a mailable with suppression checking.
+     *
+     * @param  MailableContract  $mailable
+     *
+     * @throws AddressSuppressedException
+     */
+    protected function sendMailable(MailableContract $mailable): ?SentMessage
+    {
+        // Check suppression for all recipients before sending
+        $this->checkMailableSuppression($mailable);
+
+        return parent::sendMailable($mailable);
+    }
+
+    /**
+     * Check if any recipients on a mailable are suppressed.
+     *
+     * @param  MailableContract  $mailable
+     *
+     * @throws AddressSuppressedException
+     */
+    protected function checkMailableSuppression(MailableContract $mailable): void
+    {
+        if (! EmailValidator::isSuppressionEnabled()) {
+            return;
+        }
+
+        // Collect all recipients from the mailable
+        $recipients = [];
+
+        if (property_exists($mailable, 'to')) {
+            $recipients = array_merge($recipients, (array) $mailable->to);
+        }
+        if (property_exists($mailable, 'cc')) {
+            $recipients = array_merge($recipients, (array) $mailable->cc);
+        }
+        if (property_exists($mailable, 'bcc')) {
+            $recipients = array_merge($recipients, (array) $mailable->bcc);
+        }
+
+        // Also check the global "to" set on the mailer
+        if (isset($this->to['address'])) {
+            $recipients[] = ['address' => $this->to['address']];
+        }
+
+        foreach ($recipients as $recipient) {
+            $email = is_array($recipient) ? ($recipient['address'] ?? null) : $recipient;
+
+            if (! $email) {
+                continue;
+            }
+
+            $reason = EmailValidator::getBlockReason($email, $this->provider);
+            if ($reason !== null) {
+                throw new AddressSuppressedException($email, $reason);
+            }
+        }
+    }
+
+    /**
      * Check if any recipients are suppressed and throw exception if so.
+     *
+     * @param  Email  $message  The Symfony email message
      *
      * @throws AddressSuppressedException
      */
     protected function checkSuppression(Email $message): void
     {
-        // Only check if suppression is enabled
-        if (! config('email-tracker.suppression.skip_bounced', false) &&
-            ! config('email-tracker.suppression.skip_complained', false)) {
+        if (! EmailValidator::isSuppressionEnabled()) {
             return;
         }
 
@@ -159,31 +219,11 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
         foreach ($recipients as $address) {
             $email = $address->getAddress();
 
-            if (EmailValidator::shouldBlock($email, $this->provider)) {
-                $reason = $this->getSuppressionReason($email);
+            $reason = EmailValidator::getBlockReason($email, $this->provider);
+            if ($reason !== null) {
                 throw new AddressSuppressedException($email, $reason);
             }
         }
-    }
-
-    /**
-     * Get the reason why an email is suppressed.
-     */
-    protected function getSuppressionReason(string $email): string
-    {
-        $reasons = [];
-
-        if (config('email-tracker.suppression.skip_bounced', false) &&
-            EmailValidator::hasPermanentBounce($email, $this->provider)) {
-            $reasons[] = 'permanent bounce';
-        }
-
-        if (config('email-tracker.suppression.skip_complained', false) &&
-            EmailValidator::hasComplaint($email, $this->provider)) {
-            $reasons[] = 'spam complaint';
-        }
-
-        return implode(' and ', $reasons) ?: 'suppressed';
     }
 
     /**
