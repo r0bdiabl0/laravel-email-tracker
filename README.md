@@ -137,12 +137,12 @@ POSTAL_WEBHOOK_KEY=your-secret-key            # Postal: X-Postal-Webhook-Key hea
 POSTMARK_WEBHOOK_TOKEN=your-token             # Postmark: X-Postmark-Webhook-Token header
 
 # =============================================================================
-# VALIDATION OPTIONS
+# VALIDATION OPTIONS (disabled by default)
 # =============================================================================
 
-# Automatically skip sending to problematic addresses
-EMAIL_TRACKER_SKIP_BOUNCED=false              # Skip previously bounced addresses
-EMAIL_TRACKER_SKIP_COMPLAINED=false           # Skip addresses that complained (spam)
+# Automatically skip sending to problematic addresses (recommended for production)
+EMAIL_TRACKER_SKIP_BOUNCED=false              # Set true to skip previously bounced addresses
+EMAIL_TRACKER_SKIP_COMPLAINED=false           # Set true to skip addresses that complained (spam)
 
 # =============================================================================
 # ONE-CLICK UNSUBSCRIBE (RFC 8058)
