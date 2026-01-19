@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-01-19
+
+### Fixed
+- Suppression now works when sending Mailables directly (was bypassed in v1.3.0)
+- Provider is now passed correctly when checking suppression in `TracksWithEmail` trait
+
+### Added
+- `EmailValidator::isSuppressionEnabled()` helper method
+- `EmailValidator::getBlockReason()` for efficient single-query suppression checks
+
+### Changed
+- Reduced duplicate database queries when checking suppression (2-4 queries down to 1-2)
+
 ## [1.3.0] - 2026-01-19
 
 ### Added

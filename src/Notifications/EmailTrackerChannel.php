@@ -135,6 +135,7 @@ class EmailTrackerChannel
      * Override this method to add custom logic like bounce checking.
      *
      * @param  mixed  $notifiable
+     * @param  Notification  $notification
      */
     protected function shouldSend($notifiable, Notification $notification): bool
     {
@@ -145,11 +146,9 @@ class EmailTrackerChannel
         }
 
         // Check for bounce/complaint if suppression is enabled
-        if (config('email-tracker.suppression.skip_bounced', false) ||
-            config('email-tracker.suppression.skip_complained', false)) {
-            if (EmailValidator::shouldBlock($recipient)) {
-                return false;
-            }
+        // Note: Provider-specific check happens in TrackedMailer when sending
+        if (EmailValidator::isSuppressionEnabled() && EmailValidator::shouldBlock($recipient)) {
+            return false;
         }
 
         return true;

@@ -46,7 +46,7 @@ trait TracksWithEmail
         $sent = true;
 
         foreach ($emails as $email) {
-            if (static::shouldBlockEmail($email)) {
+            if (static::shouldBlockEmail($email, $provider)) {
                 continue;
             }
 
@@ -89,7 +89,7 @@ trait TracksWithEmail
         $emails = static::filterRecipients($emails);
 
         foreach ($emails as $email) {
-            if (static::shouldBlockEmail($email)) {
+            if (static::shouldBlockEmail($email, $provider)) {
                 continue;
             }
 
@@ -116,13 +116,14 @@ trait TracksWithEmail
     /**
      * Check if an email address should be blocked from sending.
      * Override this method to add custom blocking logic.
+     *
+     * @param  string  $email  Email address to check
+     * @param  string|null  $provider  Optional provider to check against
      */
-    protected static function shouldBlockEmail(string $email): bool
+    protected static function shouldBlockEmail(string $email, ?string $provider = null): bool
     {
-        // Default implementation uses EmailValidator if suppression is enabled
-        if (config('email-tracker.suppression.skip_bounced', false) ||
-            config('email-tracker.suppression.skip_complained', false)) {
-            return EmailValidator::shouldBlock($email);
+        if (EmailValidator::isSuppressionEnabled()) {
+            return EmailValidator::shouldBlock($email, $provider);
         }
 
         return false;
