@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace R0bdiabl0\EmailTracker;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use R0bdiabl0\EmailTracker\Commands\InstallCommand;
 use R0bdiabl0\EmailTracker\Commands\MigrateFromSesCommand;
 use R0bdiabl0\EmailTracker\Commands\RollbackMigrationCommand;
+use R0bdiabl0\EmailTracker\Transports\PostalTransport;
+use R0bdiabl0\EmailTracker\Transports\ResendTransport;
 
 class EmailTrackerServiceProvider extends ServiceProvider
 {
@@ -58,6 +61,9 @@ class EmailTrackerServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register custom mail transports
+        $this->registerMailTransports();
+
         // Publish config with tag for selective publishing
         $this->publishes([
             __DIR__.'/../config/email-tracker.php' => config_path('email-tracker.php'),
@@ -86,6 +92,39 @@ class EmailTrackerServiceProvider extends ServiceProvider
                 RollbackMigrationCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Register custom mail transports for Resend and Postal.
+     *
+     * These transports allow emails to be sent through the respective APIs
+     * while maintaining full compatibility with TrackedMailer for tracking,
+     * suppression, and List-Unsubscribe headers.
+     */
+    protected function registerMailTransports(): void
+    {
+        // Register Resend transport
+        Mail::extend('resend', function (array $config = []) {
+            $apiKey = $config['key'] ?? config('services.resend.key');
+
+            if (! $apiKey) {
+                throw new \InvalidArgumentException('Resend API key not configured. Set RESEND_API_KEY in your .env file.');
+            }
+
+            return new ResendTransport($apiKey);
+        });
+
+        // Register Postal transport
+        Mail::extend('postal', function (array $config = []) {
+            $serverUrl = $config['url'] ?? config('services.postal.url');
+            $apiKey = $config['key'] ?? config('services.postal.key');
+
+            if (! $serverUrl || ! $apiKey) {
+                throw new \InvalidArgumentException('Postal server URL and API key required. Set POSTAL_URL and POSTAL_API_KEY in your .env file.');
+            }
+
+            return new PostalTransport($serverUrl, $apiKey);
+        });
     }
 
     /**

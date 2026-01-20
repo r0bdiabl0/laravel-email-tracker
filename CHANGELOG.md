@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-20
+
+### Added
+- **Resend and Postal API transports** - Emails now flow through `TrackedMailer` for all providers
+- `ResendTransport` - Symfony transport for Resend HTTP API
+- `PostalTransport` - Symfony transport for Postal HTTP API
+- Automatic transport switching when using `EmailTracker::provider('resend')` or `provider('postal')`
+- Full tracking support (opens, clicks, bounces, complaints) for Resend and Postal
+- List-Unsubscribe headers now work for all providers (not just SES)
+
+### Changed
+- `provider()` method now switches the underlying transport to use the provider's API
+- Resend and Postal emails get the same tracking features as SES (message tracking, headers, suppression)
+
+### Migration Notes
+To use Resend or Postal with full tracking support, configure them in your `config/mail.php`:
+
+```php
+'mailers' => [
+    'resend' => [
+        'transport' => 'resend',
+        'key' => env('RESEND_API_KEY'),
+    ],
+    'postal' => [
+        'transport' => 'postal',
+        'url' => env('POSTAL_URL'),
+        'key' => env('POSTAL_API_KEY'),
+    ],
+],
+```
+
+Then use the package normally:
+```php
+EmailTracker::provider('resend')->enableAllTracking()->to($user)->send($mailable);
+```
+
 ## [1.3.2] - 2026-01-20
 
 ### Fixed

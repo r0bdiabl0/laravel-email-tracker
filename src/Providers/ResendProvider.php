@@ -214,10 +214,22 @@ class ResendProvider extends AbstractProvider
 
     /**
      * Extract message ID from Resend payload.
+     *
+     * Resend returns its own email_id, but we pass our tracking message ID
+     * in the X-Message-ID header which is included in webhook payloads.
+     * We check for our custom header first, then fall back to email_id.
      */
     protected function extractMessageId(array $data): ?string
     {
-        // Resend uses 'email_id' as the message identifier
+        // First check for our custom X-Message-ID header (set by ResendTransport)
+        // This is included in the webhook payload under headers
+        $headers = $data['headers'] ?? [];
+        if (isset($headers['X-Message-ID'])) {
+            // Strip angle brackets if present (e.g., "<uuid@domain>" -> "uuid@domain")
+            return trim($headers['X-Message-ID'], '<>');
+        }
+
+        // Fall back to Resend's email_id (won't match our records, but log it)
         return $data['email_id'] ?? null;
     }
 

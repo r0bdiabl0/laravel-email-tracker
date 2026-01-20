@@ -10,6 +10,7 @@ use Illuminate\Mail\Mailer;
 use Illuminate\Mail\SentMessage;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
@@ -21,6 +22,7 @@ use R0bdiabl0\EmailTracker\Exceptions\MaximumSendingRateExceededException;
 use R0bdiabl0\EmailTracker\Exceptions\SendFailedException;
 use R0bdiabl0\EmailTracker\Exceptions\TemporaryServiceFailureException;
 use R0bdiabl0\EmailTracker\Services\EmailValidator;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Header\Headers;
 use Throwable;
@@ -29,6 +31,11 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 {
     use TrackedMailerTrait;
     use TrackingTrait;
+
+    /**
+     * The original transport (used when resetting provider).
+     */
+    protected ?TransportInterface $originalTransport = null;
 
     /**
      * Handle send exceptions and throw appropriate typed exceptions.
