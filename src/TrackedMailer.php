@@ -244,12 +244,13 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
         $message->html($this->setupTracking((string) $message->getHtmlBody(), $sentEmail));
 
-        /** @var SentMessage|null $sentMessage */
-        $sentMessage = parent::sendSymfonyMessage($message);
+        // Parent returns Symfony\Component\Mailer\SentMessage, we need to wrap it
+        // in Laravel's Illuminate\Mail\SentMessage for type compatibility
+        $symfonySentMessage = parent::sendSymfonyMessage($message);
 
         $this->sendEvent($sentEmail);
 
-        return $sentMessage;
+        return $symfonySentMessage ? new SentMessage($symfonySentMessage) : null;
     }
 
     /**
