@@ -46,6 +46,12 @@
         "phpstan/phpstan": "^1.10",
         "laravel/pint": "^1.13"
     },
+    "suggest": {
+        "resend/resend-php": "Required for Resend API transport (^1.0)",
+        "postal/postal": "Required for Postal API transport (^2.0)",
+        "symfony/mailgun-mailer": "Required for Mailgun transport",
+        "symfony/postmark-mailer": "Required for Postmark transport"
+    },
     "autoload": {
         "psr-4": {
             "R0bdiabl0\\EmailTracker\\": "src/"

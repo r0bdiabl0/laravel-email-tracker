@@ -75,7 +75,7 @@ class PostalProvider extends AbstractProvider
     protected function handleBounce(array $payload): JsonResponse
     {
         $message = $payload['message'] ?? [];
-        $messageId = $message['id'] ?? $message['message_id'] ?? null;
+        $messageId = $this->extractMessageId($message);
 
         if (! $messageId) {
             $this->logError('Bounce notification missing message ID');
@@ -121,7 +121,7 @@ class PostalProvider extends AbstractProvider
     protected function handleDelivery(array $payload): JsonResponse
     {
         $message = $payload['message'] ?? [];
-        $messageId = $message['id'] ?? $message['message_id'] ?? null;
+        $messageId = $this->extractMessageId($message);
 
         if (! $messageId) {
             $this->logError('Delivery notification missing message ID');
@@ -160,11 +160,32 @@ class PostalProvider extends AbstractProvider
     protected function handleGenericEvent(array $payload, string $eventType): JsonResponse
     {
         $message = $payload['message'] ?? [];
-        $messageId = $message['id'] ?? $message['message_id'] ?? 'unknown';
+        $messageId = $this->extractMessageId($message) ?? 'unknown';
 
         $this->logDebug("Received {$eventType} event for message: {$messageId}");
 
         return response()->json(['success' => true, 'message' => "Event {$eventType} acknowledged"]);
+    }
+
+    /**
+     * Extract message ID from Postal webhook payload.
+     *
+     * Postal returns its own message ID, but we pass our tracking message ID
+     * in the X-Message-ID header which is included in webhook payloads.
+     * We check for our custom header first, then fall back to Postal's ID.
+     */
+    protected function extractMessageId(array $message): ?string
+    {
+        // First check for our custom X-Message-ID header (set by PostalTransport)
+        // Postal includes custom headers in the webhook payload
+        $headers = $message['headers'] ?? [];
+        if (isset($headers['x-message-id'])) {
+            // Strip angle brackets if present (e.g., "<uuid@domain>" -> "uuid@domain")
+            return trim($headers['x-message-id'], '<>');
+        }
+
+        // Fall back to Postal's message ID (won't match our records, but log it)
+        return $message['id'] ?? $message['message_id'] ?? null;
     }
 
     /**

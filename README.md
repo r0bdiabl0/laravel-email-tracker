@@ -199,6 +199,58 @@ Enable only the providers you use:
 ],
 ```
 
+### Transport Configuration
+
+The package provides custom Symfony transports for providers that need HTTP API access for full tracking support. Configure these in your `config/mail.php`:
+
+```php
+// config/mail.php
+'mailers' => [
+    // Resend API transport (recommended for full tracking)
+    'resend' => [
+        'transport' => 'resend',
+        'key' => env('RESEND_API_KEY'),
+    ],
+
+    // Postal API transport (recommended for full tracking)
+    'postal' => [
+        'transport' => 'postal',
+        'url' => env('POSTAL_URL'),
+        'key' => env('POSTAL_API_KEY'),
+    ],
+
+    // SES, Mailgun, Postmark use Laravel/Symfony built-in transports
+    // SendGrid uses SMTP
+],
+```
+
+**Provider Transport Summary:**
+
+| Provider  | Transport Type | SDK Required |
+|-----------|----------------|--------------|
+| AWS SES   | Laravel built-in (`ses`) | `aws/aws-sdk-php` (included) |
+| Resend    | Package transport (`resend`) | `resend/resend-php` (optional) |
+| Postal    | Package transport (`postal`) | `postal/postal` (optional) |
+| Mailgun   | Symfony built-in (`mailgun`) | `symfony/mailgun-mailer` |
+| Postmark  | Symfony built-in (`postmark`) | `symfony/postmark-mailer` |
+| SendGrid  | SMTP | None |
+
+Install optional SDKs as needed:
+
+```bash
+# For Resend API transport
+composer require resend/resend-php
+
+# For Postal API transport
+composer require postal/postal
+
+# For Mailgun transport
+composer require symfony/mailgun-mailer
+
+# For Postmark transport
+composer require symfony/postmark-mailer
+```
+
 ### Using Multiple Providers
 
 You can enable multiple providers simultaneously and switch between them per-send:
@@ -222,6 +274,7 @@ EmailTracker::enableAllTracking()
     ->send(new WelcomeMail($user));
 
 // Override to use a specific provider for this send
+// Automatically switches to the Resend transport
 EmailTracker::provider('resend')
     ->enableAllTracking()
     ->to('user@example.com')

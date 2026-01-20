@@ -6,9 +6,11 @@ namespace R0bdiabl0\EmailTracker;
 
 use Closure;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
 use R0bdiabl0\EmailTracker\Events\EmailSentEvent;
 use R0bdiabl0\EmailTracker\Exceptions\TooManyRecipientsException;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Email;
 
 trait TrackedMailerTrait
@@ -16,6 +18,11 @@ trait TrackedMailerTrait
     protected ?Closure $initMessageCallback = null;
 
     protected string $provider = 'ses';
+
+    /**
+     * Track whether the transport has been switched for this request.
+     */
+    protected bool $transportSwitched = false;
 
     /**
      * Initialize message tracking - creates database entry for the sent email.
@@ -68,10 +75,16 @@ trait TrackedMailerTrait
 
     /**
      * Set the provider for this mailer instance.
+     *
+     * This also switches the underlying Symfony transport to use the
+     * provider-specific transport (e.g., Resend API, Postal API).
      */
     public function setProvider(string $provider): self
     {
         $this->provider = $provider;
+
+        // Switch transport if a custom transport is registered for this provider
+        $this->switchTransportForProvider($provider);
 
         return $this;
     }
@@ -82,6 +95,52 @@ trait TrackedMailerTrait
     public function provider(string $provider): self
     {
         return $this->setProvider($provider);
+    }
+
+    /**
+     * Switch the underlying transport to match the provider.
+     *
+     * If a mail transport is registered for the provider name (e.g., 'resend', 'postal'),
+     * we switch to use that transport. Otherwise, we use the default transport.
+     */
+    protected function switchTransportForProvider(string $provider): void
+    {
+        // Store original transport on first switch
+        if (! $this->transportSwitched && $this->originalTransport === null) {
+            $this->originalTransport = $this->getSymfonyTransport();
+        }
+
+        // If switching back to default provider, restore original transport
+        $defaultProvider = config('email-tracker.default_provider', 'ses');
+        if ($provider === $defaultProvider && $this->originalTransport !== null) {
+            $this->setSymfonyTransport($this->originalTransport);
+            $this->transportSwitched = false;
+
+            return;
+        }
+
+        // Check if Laravel has a mailer configured for this provider
+        // This allows using transports registered via Mail::extend()
+        try {
+            $mailer = Mail::mailer($provider);
+
+            if ($mailer && method_exists($mailer, 'getSymfonyTransport')) {
+                $transport = $mailer->getSymfonyTransport();
+                $this->setSymfonyTransport($transport);
+                $this->transportSwitched = true;
+            }
+        } catch (\InvalidArgumentException $e) {
+            // No mailer configured for this provider name.
+            // This is expected for providers using SMTP (like SES) where the
+            // default mailer is already configured correctly.
+            // Log in debug mode for troubleshooting.
+            if (config('email-tracker.debug')) {
+                $logPrefix = config('email-tracker.log_prefix', 'EMAIL-TRACKER');
+                \Illuminate\Support\Facades\Log::debug(
+                    "{$logPrefix} No dedicated mailer for provider '{$provider}', using current transport"
+                );
+            }
+        }
     }
 
     /**
