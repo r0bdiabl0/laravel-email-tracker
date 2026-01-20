@@ -59,7 +59,8 @@ class MailProcessor
         foreach ($dom->findMulti('a') as $anchor) {
             $originalUrl = $anchor->getAttribute('href');
 
-            if ((string) $originalUrl !== '') {
+            // Only track HTTP/HTTPS links - skip tel:, mailto:, javascript:, etc.
+            if ((string) $originalUrl !== '' && $this->isTrackableUrl($originalUrl)) {
                 $anchor->setAttribute('href', $this->createTrackingLink($originalUrl));
             }
         }
@@ -67,6 +68,24 @@ class MailProcessor
         $this->emailBody = $dom->innerHtml;
 
         return $this;
+    }
+
+    /**
+     * Check if a URL should be tracked.
+     *
+     * Only HTTP and HTTPS URLs are trackable. Other schemes like tel:, mailto:,
+     * javascript:, data:, etc. are left unchanged in the email.
+     */
+    protected function isTrackableUrl(string $url): bool
+    {
+        $parsed = parse_url($url);
+
+        if ($parsed === false || ! isset($parsed['scheme'])) {
+            // Relative URLs or malformed URLs - don't track
+            return false;
+        }
+
+        return in_array(strtolower($parsed['scheme']), ['http', 'https'], true);
     }
 
     /**
