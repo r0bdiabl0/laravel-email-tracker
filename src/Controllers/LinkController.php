@@ -51,8 +51,8 @@ class LinkController extends Controller
     /**
      * Validate that a URL is safe for redirection.
      *
-     * Only allows HTTP and HTTPS URLs to prevent open redirect vulnerabilities
-     * through javascript:, data:, or other potentially dangerous schemes.
+     * Allows HTTP, HTTPS, tel:, and mailto: URLs. Blocks potentially dangerous
+     * schemes like javascript:, data:, vbscript:, etc.
      */
     protected function isValidRedirectUrl(string $url): bool
     {
@@ -62,8 +62,8 @@ class LinkController extends Controller
             return false;
         }
 
-        // Only allow HTTP and HTTPS schemes
-        return in_array(strtolower($parsed['scheme']), ['http', 'https'], true);
+        // Allow safe schemes: http, https, tel, mailto
+        return in_array(strtolower($parsed['scheme']), ['http', 'https', 'tel', 'mailto'], true);
     }
 
     /**
