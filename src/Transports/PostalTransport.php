@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace R0bdiabl0\EmailTracker\Transports;
 
 use Postal\Client;
-use Postal\SendMessage;
+use Postal\Send\Message as SendMessage;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
@@ -31,7 +31,7 @@ class PostalTransport extends AbstractTransport
     {
         parent::__construct();
 
-        if (! class_exists(Client::class)) {
+        if (! class_exists(Client::class) || ! class_exists(SendMessage::class)) {
             throw new \RuntimeException(
                 'The Postal SDK is not installed. Please run: composer require postal/postal'
             );
