@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-01-22
+
+### Fixed
+- Fixed Postal transport config key conflict with Laravel's DSN URL parsing - use `server_url` or `host` instead of `url` in mail config
+
+### Changed
+- Postal transport now reads from `server_url` or `host` config keys (not `url`) to avoid Laravel's MailManager overwriting the transport driver
+
+### Migration Notes
+If you have Postal mailers configured with `url`, rename to `server_url`:
+
+```php
+// Before (broken)
+'postal' => [
+    'transport' => 'postal',
+    'url' => env('POSTAL_URL'),  // Laravel parses this as DSN
+    'key' => env('POSTAL_API_KEY'),
+],
+
+// After (fixed)
+'postal' => [
+    'transport' => 'postal',
+    'server_url' => env('POSTAL_URL'),  // Renamed to avoid DSN parsing
+    'key' => env('POSTAL_API_KEY'),
+],
+```
+
 ## [1.4.2] - 2026-01-22
 
 ### Fixed
@@ -41,7 +68,7 @@ To use Resend or Postal with full tracking support, configure them in your `conf
     ],
     'postal' => [
         'transport' => 'postal',
-        'url' => env('POSTAL_URL'),
+        'server_url' => env('POSTAL_URL'),  // Use server_url, not url
         'key' => env('POSTAL_API_KEY'),
     ],
 ],

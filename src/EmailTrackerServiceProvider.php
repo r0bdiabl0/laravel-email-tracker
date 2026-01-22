@@ -115,12 +115,14 @@ class EmailTrackerServiceProvider extends ServiceProvider
         });
 
         // Register Postal transport
+        // Note: Use 'server_url' or 'host' instead of 'url' in mail config to avoid
+        // Laravel's DSN URL parsing which would overwrite the transport driver.
         Mail::extend('postal', function (array $config = []) {
-            $serverUrl = $config['url'] ?? config('services.postal.url');
+            $serverUrl = $config['server_url'] ?? $config['host'] ?? config('services.postal.url');
             $apiKey = $config['key'] ?? config('services.postal.key');
 
             if (! $serverUrl || ! $apiKey) {
-                throw new \InvalidArgumentException('Postal server URL and API key required. Set POSTAL_URL and POSTAL_API_KEY in your .env file.');
+                throw new \InvalidArgumentException('Postal server URL and API key required. Use server_url (not url) in mail config, or set POSTAL_URL and POSTAL_API_KEY in your .env file.');
             }
 
             return new PostalTransport($serverUrl, $apiKey);
