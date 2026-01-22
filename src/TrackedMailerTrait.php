@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Mail;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
 use R0bdiabl0\EmailTracker\Events\EmailSentEvent;
 use R0bdiabl0\EmailTracker\Exceptions\TooManyRecipientsException;
-use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Email;
 
 trait TrackedMailerTrait
@@ -101,7 +100,8 @@ trait TrackedMailerTrait
      * Switch the underlying transport to match the provider.
      *
      * If a mail transport is registered for the provider name (e.g., 'resend', 'postal'),
-     * we switch to use that transport. Otherwise, we use the default transport.
+     * we switch to use that transport. For the default provider or when no dedicated
+     * mailer exists, use the original/default transport.
      */
     protected function switchTransportForProvider(string $provider): void
     {
@@ -120,7 +120,6 @@ trait TrackedMailerTrait
         }
 
         // Check if Laravel has a mailer configured for this provider
-        // This allows using transports registered via Mail::extend()
         try {
             $mailer = Mail::mailer($provider);
 
@@ -128,18 +127,32 @@ trait TrackedMailerTrait
                 $transport = $mailer->getSymfonyTransport();
                 $this->setSymfonyTransport($transport);
                 $this->transportSwitched = true;
+
+                return;
             }
-        } catch (\InvalidArgumentException $e) {
-            // No mailer configured for this provider name.
-            // This is expected for providers using SMTP (like SES) where the
-            // default mailer is already configured correctly.
-            // Log in debug mode for troubleshooting.
+        } catch (\Throwable $e) {
+            // Mailer not found or failed to initialize - restore original transport.
+            // This is critical: we must not keep whatever transport was set by a previous send.
+            if ($this->originalTransport !== null) {
+                $this->setSymfonyTransport($this->originalTransport);
+                $this->transportSwitched = false;
+            }
+
             if (config('email-tracker.debug')) {
                 $logPrefix = config('email-tracker.log_prefix', 'EMAIL-TRACKER');
                 \Illuminate\Support\Facades\Log::debug(
-                    "{$logPrefix} No dedicated mailer for provider '{$provider}', using current transport"
+                    "{$logPrefix} No dedicated mailer for provider '{$provider}', using default transport",
+                    ['error' => $e->getMessage()]
                 );
             }
+
+            return;
+        }
+
+        // No mailer method available - restore original transport
+        if ($this->originalTransport !== null) {
+            $this->setSymfonyTransport($this->originalTransport);
+            $this->transportSwitched = false;
         }
     }
 
