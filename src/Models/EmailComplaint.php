@@ -22,6 +22,7 @@ class EmailComplaint extends Model implements EmailComplaintContract
     protected $casts = [
         'sent_email_id' => 'integer',
         'complained_at' => 'datetime',
+        'metadata' => 'array',
     ];
 
     protected function getBaseTableName(): string

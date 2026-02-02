@@ -90,13 +90,21 @@ class ResendProvider extends AbstractProvider
 
             $email = $data['to'][0] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailBounce = ModelResolver::get('email_bounce')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $this->determineBounceType($data),
                 'email' => $email,
                 'bounced_at' => isset($data['created_at']) ? Carbon::parse($data['created_at']) : now(),
+                'metadata' => $storeMetadata ? $payload : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailBounce->setAttribute('metadata', $payload);
+            }
 
             event(new EmailBounceEvent($emailBounce));
 
@@ -136,13 +144,21 @@ class ResendProvider extends AbstractProvider
 
             $email = $data['to'][0] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailComplaint = ModelResolver::get('email_complaint')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => 'spam',
                 'email' => $email,
                 'complained_at' => isset($data['created_at']) ? Carbon::parse($data['created_at']) : now(),
+                'metadata' => $storeMetadata ? $payload : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailComplaint->setAttribute('metadata', $payload);
+            }
 
             event(new EmailComplaintEvent($emailComplaint));
 

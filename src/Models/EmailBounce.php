@@ -23,6 +23,7 @@ class EmailBounce extends Model implements EmailBounceContract
     protected $casts = [
         'sent_email_id' => 'integer',
         'bounced_at' => 'datetime',
+        'metadata' => 'array',
     ];
 
     protected function getBaseTableName(): string

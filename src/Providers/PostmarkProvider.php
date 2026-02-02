@@ -87,13 +87,21 @@ class PostmarkProvider extends AbstractProvider
 
             $email = $payload['Email'] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailBounce = ModelResolver::get('email_bounce')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $this->determineBounceType($payload),
                 'email' => $email,
                 'bounced_at' => isset($payload['BouncedAt']) ? Carbon::parse($payload['BouncedAt']) : now(),
+                'metadata' => $storeMetadata ? $payload : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailBounce->setAttribute('metadata', $payload);
+            }
 
             event(new EmailBounceEvent($emailBounce));
 
@@ -132,6 +140,8 @@ class PostmarkProvider extends AbstractProvider
 
             $email = $payload['Email'] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailComplaint = ModelResolver::get('email_complaint')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
@@ -139,7 +149,13 @@ class PostmarkProvider extends AbstractProvider
                 'email' => $email,
                 // SpamComplaint uses 'BouncedAt' in Postmark's payload (same field name as bounces)
                 'complained_at' => isset($payload['BouncedAt']) ? Carbon::parse($payload['BouncedAt']) : now(),
+                'metadata' => $storeMetadata ? $payload : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailComplaint->setAttribute('metadata', $payload);
+            }
 
             event(new EmailComplaintEvent($emailComplaint));
 

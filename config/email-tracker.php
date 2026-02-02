@@ -164,6 +164,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Metadata Storage
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, raw webhook payloads are stored in the metadata column of
+    | email_bounces and email_complaints tables. This provides detailed
+    | diagnostic information (SMTP error codes, IP blocks, etc.).
+    |
+    | Disable if:
+    | - You process webhooks in real-time via event listeners
+    | - You store raw payloads in your own tables
+    | - You want to minimize database storage
+    |
+    | Note: Even when disabled, metadata is still available in real-time via
+    | the EmailBounceEvent and EmailComplaintEvent - it's just not persisted.
+    |
+    */
+
+    'store_metadata' => env('EMAIL_TRACKER_STORE_METADATA', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Route Configuration
     |--------------------------------------------------------------------------
     |

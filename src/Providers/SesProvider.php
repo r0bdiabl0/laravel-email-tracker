@@ -253,13 +253,21 @@ class SesProvider extends AbstractProvider
             $bouncedRecipients = $bounce['bouncedRecipients'] ?? [];
             $email = $bouncedRecipients[0]['emailAddress'] ?? $mail['destination'][0] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailBounce = ModelResolver::get('email_bounce')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $bounce['bounceType'] ?? null,
                 'email' => $email,
                 'bounced_at' => isset($bounce['timestamp']) ? \Carbon\Carbon::parse($bounce['timestamp']) : now(),
+                'metadata' => $storeMetadata ? $content : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailBounce->setAttribute('metadata', $content);
+            }
 
             event(new EmailBounceEvent($emailBounce));
 
@@ -303,13 +311,21 @@ class SesProvider extends AbstractProvider
             $complainedRecipients = $complaint['complainedRecipients'] ?? [];
             $email = $complainedRecipients[0]['emailAddress'] ?? $mail['destination'][0] ?? '';
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailComplaint = ModelResolver::get('email_complaint')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $complaint['complaintFeedbackType'] ?? null,
                 'email' => $email,
                 'complained_at' => isset($complaint['timestamp']) ? \Carbon\Carbon::parse($complaint['timestamp']) : now(),
+                'metadata' => $storeMetadata ? $content : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata) {
+                $emailComplaint->setAttribute('metadata', $content);
+            }
 
             event(new EmailComplaintEvent($emailComplaint));
 

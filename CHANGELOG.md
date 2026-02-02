@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-02-02
+
+### Added
+- Added `metadata` JSON column to `email_bounces` and `email_complaints` tables
+- Added `store_metadata` config option (default: `false`) to control whether raw webhook payloads are persisted to the database
+- All providers (SES, Resend, Postal, Mailgun, SendGrid, Postmark) support metadata storage
+- Metadata is always available in event listeners (via `$event->emailBounce->metadata`) regardless of the `store_metadata` setting
+- Enables detection of IP blocks, connection failures, and detailed SMTP error codes from the raw provider data
+
+### Changed
+- Metadata storage is now opt-in (disabled by default) to minimize database storage for high-volume senders
+- Real-time event processing is now the recommended approach for handling diagnostic information
+
+### Upgrade Notes
+Existing users must republish and run migrations to add the new `metadata` column:
+
+```bash
+php artisan vendor:publish --tag=email-tracker-migrations
+php artisan migrate
+```
+
+The migration is safe for existing installations - it only adds the new nullable column without affecting existing data.
+
+To enable persistent metadata storage, add to your `.env`:
+
+```env
+EMAIL_TRACKER_STORE_METADATA=true
+```
+
+**Note:** Even without enabling storage, metadata is available in your event listeners for real-time processing.
+
 ## [1.4.5] - 2026-01-22
 
 ### Added

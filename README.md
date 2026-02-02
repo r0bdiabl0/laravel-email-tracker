@@ -154,6 +154,14 @@ EMAIL_TRACKER_UNSUBSCRIBE_EXPIRATION=0        # Signature expiration in hours (0
 EMAIL_TRACKER_UNSUBSCRIBE_REDIRECT=           # Redirect URL after unsubscribe (null = JSON)
 
 # =============================================================================
+# METADATA / STORAGE OPTIONS
+# =============================================================================
+
+# Store raw webhook payloads in metadata column (default: false)
+# When false, metadata is still available in events for real-time processing
+EMAIL_TRACKER_STORE_METADATA=false
+
+# =============================================================================
 # OTHER OPTIONS
 # =============================================================================
 
@@ -662,18 +670,41 @@ class HandleEmailBounce
         $bounce = $event->emailBounce;
         $email = $bounce->email;
         $type = $bounce->type; // 'Permanent' or 'Transient'
+        $metadata = $bounce->metadata; // Raw webhook payload
 
         if ($type === 'Permanent') {
             // Mark user as having invalid email
             User::where('email', $email)->update(['email_valid' => false]);
         }
 
+        // Access provider-specific diagnostic information from metadata
+        // For SES: $metadata['bounce']['bouncedRecipients'][0]['diagnosticCode']
+        // For Mailgun: $metadata['event-data']['delivery-status']['message']
+        // For SendGrid: $metadata['reason']
+        $diagnosticCode = $this->extractDiagnosticCode($metadata, $bounce->provider);
+
         // Log for monitoring
         Log::warning("Email bounced", [
             'email' => $email,
             'type' => $type,
             'provider' => $bounce->provider,
+            'diagnostic_code' => $diagnosticCode,
         ]);
+    }
+
+    private function extractDiagnosticCode(?array $metadata, string $provider): ?string
+    {
+        if (!$metadata) {
+            return null;
+        }
+
+        return match ($provider) {
+            'ses' => $metadata['bounce']['bouncedRecipients'][0]['diagnosticCode'] ?? null,
+            'mailgun' => $metadata['event-data']['delivery-status']['message'] ?? null,
+            'sendgrid' => $metadata['reason'] ?? null,
+            'postmark' => $metadata['Description'] ?? null,
+            default => null,
+        };
     }
 }
 ```
@@ -746,6 +777,7 @@ The package creates the following tables (with optional prefix):
 | type | string | Bounce type (Permanent/Transient) |
 | email | string | Bounced email address |
 | bounced_at | timestamp | When bounce occurred |
+| metadata | json | Raw webhook payload (for diagnostic details) |
 
 ### email_complaints
 
@@ -757,6 +789,7 @@ The package creates the following tables (with optional prefix):
 | type | string | Complaint type (spam, etc.) |
 | email | string | Complaining email address |
 | complained_at | timestamp | When complaint occurred |
+| metadata | json | Raw webhook payload (for diagnostic details) |
 
 ### email_opens
 
@@ -784,6 +817,65 @@ The package creates the following tables (with optional prefix):
 |--------|------|-------------|
 | id | bigint | Primary key |
 | name | string | Batch identifier |
+
+### Metadata Storage Considerations
+
+The `metadata` column in `email_bounces` and `email_complaints` tables can store raw webhook payloads from email providers. This provides valuable diagnostic information but is **disabled by default**.
+
+**Configuration:**
+
+```env
+# Enable metadata storage (default: false)
+EMAIL_TRACKER_STORE_METADATA=true
+```
+
+**Important:** Even when `store_metadata` is `false`, the raw webhook payload is still available in event listeners via the `metadata` property. This allows you to process diagnostic information in real-time without persisting it to the database.
+
+```php
+// In your event listener - metadata is ALWAYS available
+public function handle(EmailBounceEvent $event): void
+{
+    $metadata = $event->emailBounce->metadata; // Available regardless of store_metadata config
+    $diagnosticCode = $metadata['bounce']['bouncedRecipients'][0]['diagnosticCode'] ?? null;
+
+    // Process in real-time...
+}
+```
+
+**When to enable persistent storage:**
+- You need to analyze bounce/complaint patterns historically
+- You want to debug delivery issues after the fact
+- You're building reporting dashboards that query metadata
+- You don't have real-time event listeners processing webhooks
+
+**When to keep disabled (default):**
+- You process events in real-time via listeners
+- You store relevant data in your own application tables
+- You want to minimize database storage
+- You have PII concerns about storing raw payloads
+
+**What metadata contains:**
+- Full webhook payload from the email provider
+- SMTP error codes and diagnostic messages
+- Email addresses and timestamps
+- Provider-specific debugging information
+
+**Storage considerations:**
+- Payloads vary by provider (typically 1-5 KB per record)
+- High-volume senders should monitor database growth
+- Consider implementing a cleanup job for old records
+
+**Privacy considerations:**
+- Metadata may contain email addresses (PII)
+- Apply appropriate data retention policies
+- Ensure database access controls are in place
+
+**Example cleanup job:**
+```php
+// Delete bounce/complaint records older than 90 days
+EmailBounce::where('bounced_at', '<', now()->subDays(90))->delete();
+EmailComplaint::where('complained_at', '<', now()->subDays(90))->delete();
+```
 
 ## Querying Data
 

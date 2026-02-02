@@ -106,13 +106,21 @@ abstract class AbstractProvider implements EmailProviderInterface
                 ->where('bounce_tracking', true)
                 ->firstOrFail();
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailBounce = ModelResolver::get('email_bounce')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $data->bounceType ?? 'Permanent',
                 'email' => $data->email,
                 'bounced_at' => $data->timestamp ?? now(),
+                'metadata' => $storeMetadata ? ($data->metadata ?: null) : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata && $data->metadata) {
+                $emailBounce->setAttribute('metadata', $data->metadata);
+            }
 
             event(new EmailBounceEvent($emailBounce));
 
@@ -152,13 +160,21 @@ abstract class AbstractProvider implements EmailProviderInterface
                 ->where('complaint_tracking', true)
                 ->firstOrFail();
 
+            $storeMetadata = config('email-tracker.store_metadata', false);
+
             $emailComplaint = ModelResolver::get('email_complaint')::create([
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $data->complaintType ?? 'spam',
                 'email' => $data->email,
                 'complained_at' => $data->timestamp ?? now(),
+                'metadata' => $storeMetadata ? ($data->metadata ?: null) : null,
             ]);
+
+            // Ensure metadata is available in event even if not persisted
+            if (! $storeMetadata && $data->metadata) {
+                $emailComplaint->setAttribute('metadata', $data->metadata);
+            }
 
             event(new EmailComplaintEvent($emailComplaint));
 
