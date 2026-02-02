@@ -29,6 +29,7 @@ A **multi-provider email tracking and bounce management package** for Laravel 11
 - [Querying Data](#querying-data)
 - [Migrating from juhasev/laravel-ses](#migrating-from-juhasevlaravel-ses)
 - [Admin Panel Plugins](#admin-panel-plugins)
+- [Laravel Boost AI Integration](#laravel-boost-ai-integration)
 - [Extending](#extending)
   - [Custom Providers](#custom-providers)
   - [Custom Models](#custom-models)
@@ -989,6 +990,21 @@ Features:
 - **Read-Only** - Safe viewing without accidental modifications
 
 The resources are auto-registered. See [r0bdiabl0/laravel-email-tracker-nova](https://github.com/r0bdiabl0/laravel-email-tracker-nova) for customization options.
+
+## Laravel Boost AI Integration
+
+This package includes [Laravel Boost](https://github.com/laravelboost/boost) AI guidelines and skills to help AI assistants generate correct code for your email tracking implementation.
+
+When you run `php artisan boost:install` in your Laravel application, Boost automatically loads:
+
+- **AI Guidelines** - Package overview, API examples, and configuration reference
+- **Skills** - Interactive commands for common tasks:
+  - `/send-tracked-email` - Send emails with tracking, batches, and unsubscribe headers
+  - `/handle-email-events` - Create event listeners for bounces, complaints, opens, clicks
+  - `/create-email-provider` - Build custom provider integrations
+  - `/setup-suppression` - Configure bounce management
+
+No additional configuration required - Boost discovers the package's AI resources automatically.
 
 ## Extending
 

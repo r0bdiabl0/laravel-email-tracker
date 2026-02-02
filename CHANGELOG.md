@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-02
+
+### Added
+- Added Laravel Boost AI integration with guidelines and skills
+- AI Guidelines (`resources/boost/guidelines/core.blade.php`) provide package overview and code examples
+- Four AI Skills for common tasks:
+  - `/send-tracked-email` - Send emails with tracking, batches, and unsubscribe headers
+  - `/handle-email-events` - Create event listeners for bounces, complaints, opens, clicks
+  - `/create-email-provider` - Build custom provider integrations
+  - `/setup-suppression` - Configure bounce management
+- Skills are automatically installed when users run `php artisan boost:install`
+
 ## [1.5.1] - 2026-02-02
 
 ### Fixed
