@@ -14,3 +14,6 @@ coverage/
 Thumbs.db
 phpunit.xml
 .env
+
+# Claude Code local settings
+.claude/
