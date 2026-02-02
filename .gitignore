@@ -17,3 +17,4 @@ phpunit.xml
 
 # Claude Code local settings
 .claude/
+CLAUDE.md
