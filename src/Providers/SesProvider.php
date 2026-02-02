@@ -8,7 +8,6 @@ use Aws\Sns\Exception\InvalidSnsMessageException;
 use Aws\Sns\Message;
 use Aws\Sns\MessageValidator;
 use Exception;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -211,6 +210,71 @@ class SesProvider extends AbstractProvider
     }
 
     /**
+     * Find a sent email by message ID with fallback to Message-ID header.
+     *
+     * SES assigns its own message ID which may differ from the Message-ID header
+     * we set on the outgoing email. This method first tries to find by SES's
+     * messageId, then falls back to checking the original Message-ID header.
+     *
+     * @param  string  $sesMessageId  The messageId from SES webhook
+     * @param  array  $mail  The mail object from the webhook payload
+     * @param  string  $trackingColumn  The tracking column to check (bounce_tracking, complaint_tracking, delivery_tracking)
+     * @return \R0bdiabl0\EmailTracker\Contracts\SentEmailContract|null
+     */
+    protected function findSentEmail(string $sesMessageId, array $mail, string $trackingColumn)
+    {
+        // First try with SES's message ID
+        $sentEmail = ModelResolver::get('sent_email')::query()
+            ->where('message_id', $sesMessageId)
+            ->where($trackingColumn, true)
+            ->first();
+
+        if ($sentEmail) {
+            return $sentEmail;
+        }
+
+        // Fallback: try to find by the Message-ID header we set
+        $headerMessageId = $this->extractMessageIdFromHeaders($mail);
+
+        if ($headerMessageId) {
+            $sentEmail = ModelResolver::get('sent_email')::query()
+                ->where('message_id', $headerMessageId)
+                ->where($trackingColumn, true)
+                ->first();
+
+            if ($sentEmail) {
+                $this->logDebug("Found sent email via Message-ID header fallback: {$headerMessageId}");
+
+                return $sentEmail;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract the Message-ID header from SES webhook mail headers.
+     *
+     * SES includes original email headers in the webhook payload.
+     * The headers array contains objects with 'name' and 'value' keys.
+     */
+    protected function extractMessageIdFromHeaders(array $mail): ?string
+    {
+        $headers = $mail['headers'] ?? [];
+
+        foreach ($headers as $header) {
+            if (isset($header['name'], $header['value'])) {
+                if (strtolower($header['name']) === 'message-id') {
+                    // Strip angle brackets if present: <uuid@domain> -> uuid@domain
+                    return trim($header['value'], '<>');
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Determine event type from message content.
      */
     protected function determineEventType(array $content): string
@@ -245,10 +309,13 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::query()
-                ->where('message_id', $messageId)
-                ->where('bounce_tracking', true)
-                ->firstOrFail();
+            $sentEmail = $this->findSentEmail($messageId, $mail, 'bounce_tracking');
+
+            if (! $sentEmail) {
+                $this->logDebug("Message ID ({$messageId}) not found or bounce tracking disabled. Skipping...");
+
+                return response()->json(['success' => true, 'message' => 'Message not tracked']);
+            }
 
             $bouncedRecipients = $bounce['bouncedRecipients'] ?? [];
             $email = $bouncedRecipients[0]['emailAddress'] ?? $mail['destination'][0] ?? '';
@@ -274,11 +341,6 @@ class SesProvider extends AbstractProvider
             $this->logDebug("Bounce processed for: {$email}");
 
             return response()->json(['success' => true, 'message' => 'Bounce processed']);
-
-        } catch (ModelNotFoundException) {
-            $this->logDebug("Message ID ({$messageId}) not found or bounce tracking disabled. Skipping...");
-
-            return response()->json(['success' => true, 'message' => 'Message not tracked']);
         } catch (Exception $e) {
             $this->logError("Failed to process bounce: {$e->getMessage()}");
 
@@ -303,10 +365,13 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::query()
-                ->where('message_id', $messageId)
-                ->where('complaint_tracking', true)
-                ->firstOrFail();
+            $sentEmail = $this->findSentEmail($messageId, $mail, 'complaint_tracking');
+
+            if (! $sentEmail) {
+                $this->logDebug("Message ID ({$messageId}) not found or complaint tracking disabled. Skipping...");
+
+                return response()->json(['success' => true, 'message' => 'Message not tracked']);
+            }
 
             $complainedRecipients = $complaint['complainedRecipients'] ?? [];
             $email = $complainedRecipients[0]['emailAddress'] ?? $mail['destination'][0] ?? '';
@@ -332,11 +397,6 @@ class SesProvider extends AbstractProvider
             $this->logDebug("Complaint processed for: {$email}");
 
             return response()->json(['success' => true, 'message' => 'Complaint processed']);
-
-        } catch (ModelNotFoundException) {
-            $this->logDebug("Message ID ({$messageId}) not found or complaint tracking disabled. Skipping...");
-
-            return response()->json(['success' => true, 'message' => 'Message not tracked']);
         } catch (Exception $e) {
             $this->logError("Failed to process complaint: {$e->getMessage()}");
 
@@ -361,10 +421,13 @@ class SesProvider extends AbstractProvider
         }
 
         try {
-            $sentEmail = ModelResolver::get('sent_email')::query()
-                ->where('message_id', $messageId)
-                ->where('delivery_tracking', true)
-                ->firstOrFail();
+            $sentEmail = $this->findSentEmail($messageId, $mail, 'delivery_tracking');
+
+            if (! $sentEmail) {
+                $this->logDebug("Message ID ({$messageId}) not found or delivery tracking disabled. Skipping...");
+
+                return response()->json(['success' => true, 'message' => 'Message not tracked']);
+            }
 
             $timestamp = $delivery['timestamp'] ?? null;
             $sentEmail->setDeliveredAt($timestamp ? \Carbon\Carbon::parse($timestamp) : now());
@@ -374,11 +437,6 @@ class SesProvider extends AbstractProvider
             $this->logDebug("Delivery processed for message: {$messageId}");
 
             return response()->json(['success' => true, 'message' => 'Delivery processed']);
-
-        } catch (ModelNotFoundException) {
-            $this->logDebug("Message ID ({$messageId}) not found or delivery tracking disabled. Skipping...");
-
-            return response()->json(['success' => true, 'message' => 'Message not tracked']);
         } catch (Exception $e) {
             $this->logError("Failed to process delivery: {$e->getMessage()}");
 

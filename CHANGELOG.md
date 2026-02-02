@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-02-02
+
+### Fixed
+- Fixed SES webhook message ID mismatch where bounces/complaints/deliveries weren't being processed
+- SES provider now checks original Message-ID header as fallback when AWS's assigned messageId doesn't match stored records
+- This fixes tracking for emails sent through the package's TrackedMailer which sets a custom Message-ID header
+
 ## [1.5.0] - 2026-02-02
 
 ### Added
