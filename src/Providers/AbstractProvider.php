@@ -108,17 +108,22 @@ abstract class AbstractProvider implements EmailProviderInterface
 
             $storeMetadata = config('email-tracker.store_metadata', false);
 
-            $emailBounce = ModelResolver::get('email_bounce')::create([
+            $bounceData = [
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $data->bounceType ?? 'Permanent',
                 'email' => $data->email,
                 'bounced_at' => $data->timestamp ?? now(),
-                'metadata' => $storeMetadata ? ($data->metadata ?: null) : null,
-            ]);
+            ];
 
-            // Ensure metadata is available in event even if not persisted
-            if (! $storeMetadata && $data->metadata) {
+            if ($storeMetadata) {
+                $bounceData['metadata'] = $data->metadata ?: null;
+            }
+
+            $emailBounce = ModelResolver::get('email_bounce')::create($bounceData);
+
+            // Always set metadata on model for event listeners
+            if ($data->metadata) {
                 $emailBounce->setAttribute('metadata', $data->metadata);
             }
 
@@ -162,17 +167,22 @@ abstract class AbstractProvider implements EmailProviderInterface
 
             $storeMetadata = config('email-tracker.store_metadata', false);
 
-            $emailComplaint = ModelResolver::get('email_complaint')::create([
+            $complaintData = [
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $data->complaintType ?? 'spam',
                 'email' => $data->email,
                 'complained_at' => $data->timestamp ?? now(),
-                'metadata' => $storeMetadata ? ($data->metadata ?: null) : null,
-            ]);
+            ];
 
-            // Ensure metadata is available in event even if not persisted
-            if (! $storeMetadata && $data->metadata) {
+            if ($storeMetadata) {
+                $complaintData['metadata'] = $data->metadata ?: null;
+            }
+
+            $emailComplaint = ModelResolver::get('email_complaint')::create($complaintData);
+
+            // Always set metadata on model for event listeners
+            if ($data->metadata) {
                 $emailComplaint->setAttribute('metadata', $data->metadata);
             }
 

@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `/setup-suppression` - Configure bounce management
 - Skills are automatically installed when users run `php artisan boost:install`
 
+## [1.5.2] - 2026-02-02
+
+### Fixed
+- Fixed breaking change for users who haven't run the metadata migration
+- Metadata column is now only included in insert queries when `store_metadata` is enabled
+- Users without the metadata column can now use the package without errors
+
 ## [1.5.1] - 2026-02-02
 
 ### Fixed

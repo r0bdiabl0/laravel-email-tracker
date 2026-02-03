@@ -93,19 +93,22 @@ class PostalProvider extends AbstractProvider
 
             $storeMetadata = config('email-tracker.store_metadata', false);
 
-            $emailBounce = ModelResolver::get('email_bounce')::create([
+            $bounceData = [
                 'provider' => $this->getName(),
                 'sent_email_id' => $sentEmail->id,
                 'type' => $this->determineBounceType($payload),
                 'email' => $email,
                 'bounced_at' => isset($payload['timestamp']) ? Carbon::createFromTimestamp($payload['timestamp']) : now(),
-                'metadata' => $storeMetadata ? $payload : null,
-            ]);
+            ];
 
-            // Ensure metadata is available in event even if not persisted
-            if (! $storeMetadata) {
-                $emailBounce->setAttribute('metadata', $payload);
+            if ($storeMetadata) {
+                $bounceData['metadata'] = $payload;
             }
+
+            $emailBounce = ModelResolver::get('email_bounce')::create($bounceData);
+
+            // Always set metadata on model for event listeners
+            $emailBounce->setAttribute('metadata', $payload);
 
             event(new EmailBounceEvent($emailBounce));
 
