@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-02-02
+
+### Fixed
+- Fixed SES webhook message ID mismatch where bounces/complaints/deliveries weren't being processed
+- SES provider now checks original Message-ID header as fallback when AWS's assigned messageId doesn't match stored records
+- Fixed breaking change for users who haven't run the metadata migration
+- Metadata column is now only included in insert queries when `store_metadata` is enabled
+
 ## [1.6.0] - 2026-02-02
 
 ### Added
