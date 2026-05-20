@@ -82,18 +82,7 @@ class UnsubscribeUrlGeneratorBindingTest extends TestCase
 
         $this->app->bind(UnsubscribeUrlGenerator::class, fn () => $this->customGenerator());
 
-        $mailer = $this->app->make(TrackedMailer::class);
-        $headers = new Headers;
-
-        // addUnsubscribeHeaders() is protected; invoke it bound to the mailer instance.
-        $invoke = Closure::bind(
-            function (Headers $headers, SentEmailContract $email) {
-                $this->addUnsubscribeHeaders($headers, $email);
-            },
-            $mailer,
-            TrackedMailer::class,
-        );
-        $invoke($headers, $this->fakeEmail());
+        $headers = $this->buildHeaders();
 
         $listUnsubscribe = iterator_to_array($headers->all('list-unsubscribe'), false);
         $this->assertCount(1, $listUnsubscribe);
@@ -104,5 +93,56 @@ class UnsubscribeUrlGeneratorBindingTest extends TestCase
 
         $post = iterator_to_array($headers->all('list-unsubscribe-post'), false);
         $this->assertCount(1, $post);
+    }
+
+    public function test_includes_mailto_fallback_when_configured(): void
+    {
+        config()->set('email-tracker.unsubscribe.enabled', true);
+        config()->set('email-tracker.unsubscribe.mailto', 'unsub@example.com');
+
+        $this->app->bind(UnsubscribeUrlGenerator::class, fn () => $this->customGenerator());
+
+        $headers = $this->buildHeaders();
+
+        $listUnsubscribe = iterator_to_array($headers->all('list-unsubscribe'), false);
+        $this->assertCount(1, $listUnsubscribe);
+
+        $value = $listUnsubscribe[0]->getBodyAsString();
+        $this->assertStringContainsString('<mailto:unsub@example.com>', $value);
+        $this->assertStringContainsString('https://example.com/u/custom-token', $value);
+    }
+
+    public function test_default_generator_flows_through_mailer_as_single_header(): void
+    {
+        config()->set('email-tracker.unsubscribe.enabled', true);
+        config()->set('email-tracker.unsubscribe.mailto', null);
+        config()->set('email-tracker.unsubscribe.signature_expiration', 0);
+
+        // No custom binding: exercise the package default through the mailer.
+        $headers = $this->buildHeaders();
+
+        $listUnsubscribe = iterator_to_array($headers->all('list-unsubscribe'), false);
+        $this->assertCount(1, $listUnsubscribe);
+        $this->assertStringContainsString('signature=', $listUnsubscribe[0]->getBodyAsString());
+    }
+
+    /**
+     * Invoke the protected addUnsubscribeHeaders() on a real mailer instance.
+     */
+    private function buildHeaders(): Headers
+    {
+        $mailer = $this->app->make(TrackedMailer::class);
+        $headers = new Headers;
+
+        $invoke = Closure::bind(
+            function (Headers $headers, SentEmailContract $email) {
+                $this->addUnsubscribeHeaders($headers, $email);
+            },
+            $mailer,
+            TrackedMailer::class,
+        );
+        $invoke($headers, $this->fakeEmail());
+
+        return $headers;
     }
 }

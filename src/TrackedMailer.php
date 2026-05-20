@@ -292,6 +292,8 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
      */
     protected function addUnsubscribeHeaders(Headers $headers, SentEmailContract $email): void
     {
+        // Resolve the URL strategy from the container. The default binding lives in
+        // EmailTrackerServiceProvider; apps may bind their own UnsubscribeUrlGenerator.
         $unsubscribeUrl = app(UnsubscribeUrlGenerator::class)->generate($email);
 
         // Build List-Unsubscribe header value
