@@ -10,7 +10,6 @@ use Illuminate\Mail\Mailer;
 use Illuminate\Mail\SentMessage;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
 use R0bdiabl0\EmailTracker\Contracts\TrackedMailerInterface;
@@ -146,7 +145,6 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
     /**
      * Send a mailable with suppression checking.
      *
-     * @param  MailableContract  $mailable
      *
      * @throws AddressSuppressedException
      */
@@ -161,7 +159,6 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
     /**
      * Check if any recipients on a mailable are suppressed.
      *
-     * @param  MailableContract  $mailable
      *
      * @throws AddressSuppressedException
      */
@@ -220,7 +217,7 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
         $recipients = array_merge(
             $message->getTo(),
             $message->getCc(),
-            $message->getBcc()
+            $message->getBcc(),
         );
 
         foreach ($recipients as $address) {
