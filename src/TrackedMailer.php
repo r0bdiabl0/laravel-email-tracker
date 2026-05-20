@@ -11,10 +11,10 @@ use Illuminate\Mail\SentMessage;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
 use R0bdiabl0\EmailTracker\Contracts\TrackedMailerInterface;
+use R0bdiabl0\EmailTracker\Contracts\UnsubscribeUrlGenerator;
 use R0bdiabl0\EmailTracker\Exceptions\AddressSuppressedException;
 use R0bdiabl0\EmailTracker\Exceptions\DailyQuotaExceededException;
 use R0bdiabl0\EmailTracker\Exceptions\InvalidSenderAddressException;
@@ -295,7 +295,7 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
      */
     protected function addUnsubscribeHeaders(Headers $headers, SentEmailContract $email): void
     {
-        $unsubscribeUrl = $this->generateUnsubscribeUrl($email);
+        $unsubscribeUrl = app(UnsubscribeUrlGenerator::class)->generate($email);
 
         // Build List-Unsubscribe header value
         $listUnsubscribe = "<{$unsubscribeUrl}>";
@@ -310,31 +310,6 @@ class TrackedMailer extends Mailer implements TrackedMailerInterface
 
         // RFC 8058 requires this header for one-click unsubscribe
         $headers->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
-    }
-
-    /**
-     * Generate a signed unsubscribe URL.
-     */
-    protected function generateUnsubscribeUrl(SentEmailContract $email): string
-    {
-        $routePrefix = config('email-tracker.routes.prefix', 'email-tracker');
-        $expiration = (int) config('email-tracker.unsubscribe.signature_expiration', 0);
-
-        $params = [
-            'email' => $email->getEmail(),
-            'message_id' => $email->getMessageId(),
-        ];
-
-        // Use Laravel's signed URL functionality
-        if ($expiration > 0) {
-            return URL::temporarySignedRoute(
-                'email-tracker.unsubscribe',
-                now()->addHours($expiration),
-                $params,
-            );
-        }
-
-        return URL::signedRoute('email-tracker.unsubscribe', $params);
     }
 
     /**

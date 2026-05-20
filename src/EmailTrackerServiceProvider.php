@@ -10,6 +10,8 @@ use Illuminate\Support\ServiceProvider;
 use R0bdiabl0\EmailTracker\Commands\InstallCommand;
 use R0bdiabl0\EmailTracker\Commands\MigrateFromSesCommand;
 use R0bdiabl0\EmailTracker\Commands\RollbackMigrationCommand;
+use R0bdiabl0\EmailTracker\Contracts\UnsubscribeUrlGenerator;
+use R0bdiabl0\EmailTracker\Services\SignedUnsubscribeUrlGenerator;
 use R0bdiabl0\EmailTracker\Transports\PostalTransport;
 use R0bdiabl0\EmailTracker\Transports\ResendTransport;
 
@@ -51,6 +53,11 @@ class EmailTrackerServiceProvider extends ServiceProvider
 
         // Register facade accessor
         $this->app->alias(TrackedMailer::class, 'email-tracker');
+
+        // Bind the default unsubscribe URL generator. Apps may override this
+        // binding to supply their own URL scheme. Bound (not singleton) so it
+        // resolves fresh per request — Octane-safe, no mutable global state.
+        $this->app->bind(UnsubscribeUrlGenerator::class, SignedUnsubscribeUrlGenerator::class);
 
         // Register provider handlers
         $this->registerProviders();
