@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-05-20
+
+### Added
+- Pluggable unsubscribe URL generation via the new `UnsubscribeUrlGenerator` contract. Bind your
+  own implementation in a service provider to use a custom unsubscribe URL scheme; the package
+  retains ownership of RFC 8058 header assembly, so there is always a single `List-Unsubscribe`
+  header path.
+
+### Changed
+- The signed-URL behavior now lives in `SignedUnsubscribeUrlGenerator` (the default binding).
+  Behavior is unchanged for existing consumers — non-expiring signed URLs by default, time-limited
+  when `unsubscribe.signature_expiration` is greater than `0`.
+
 ## [1.6.1] - 2026-02-02
 
 ### Fixed

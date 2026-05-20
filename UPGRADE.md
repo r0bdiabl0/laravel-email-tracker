@@ -284,6 +284,16 @@ And clear config cache:
 php artisan config:clear
 ```
 
+## Version Upgrades
+
+### Upgrading to 1.7.0
+
+No action required — existing behavior is unchanged. Unsubscribe links are still non-expiring
+signed URLs by default.
+
+To customize the unsubscribe URL, bind your own `UnsubscribeUrlGenerator` implementation in a
+service provider. See "Customizing the Unsubscribe URL" in the README.
+
 ## Questions?
 
 Open an issue at: https://github.com/r0bdiabl0/laravel-email-tracker/issues

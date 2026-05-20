@@ -552,6 +552,37 @@ EmailTracker::enableAllTracking()
 ],
 ```
 
+### Customizing the Unsubscribe URL
+
+By default the package generates a non-expiring Laravel signed URL pointing at the
+`email-tracker.unsubscribe` route. Set `unsubscribe.signature_expiration` above `0` to make those
+links time-limited — not recommended, since a recipient who opens the email after the window can
+no longer unsubscribe.
+
+To use a completely different URL scheme (for example a persistent token URL that does not depend
+on `APP_KEY`), bind your own implementation of `UnsubscribeUrlGenerator`:
+
+```php
+use R0bdiabl0\EmailTracker\Contracts\SentEmailContract;
+use R0bdiabl0\EmailTracker\Contracts\UnsubscribeUrlGenerator;
+
+// In a service provider's register() method:
+$this->app->bind(UnsubscribeUrlGenerator::class, function () {
+    return new class implements UnsubscribeUrlGenerator
+    {
+        public function generate(SentEmailContract $email): string
+        {
+            // Return whatever persistent URL your application uses.
+            return route('my.unsubscribe', ['token' => /* your token for $email */]);
+        }
+    };
+});
+```
+
+The package always owns the RFC 8058 header assembly (`List-Unsubscribe`, `List-Unsubscribe-Post`,
+and the optional `mailto:` fallback) — you only supply the URL, so there is exactly one header path
+and no risk of duplicate `List-Unsubscribe` headers.
+
 ### Handling Unsubscribe Events
 
 Register a listener for the `EmailUnsubscribeEvent`:
